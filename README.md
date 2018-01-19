@@ -13,4 +13,4 @@ Run the following command from within your virtual environment:
 pip install git+git://github.com/vsuthichai/paraphraser.git
 ```
 
-![Example](/images/example.png)
+<img src="https://raw.githubusercontent.com/vsuthichai/paraphraser/master/images/example.png" align="center" height="700" width="640" >
