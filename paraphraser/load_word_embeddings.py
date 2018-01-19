@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+from keras.layers.embeddings import Embedding
 
 def add_start_end_tokens(vocab_to_id, id_to_vocab, embeddings):
     vocab_size, dim_size = embeddings.shape
@@ -44,6 +45,6 @@ def load_glove_pickle(filename):
 
 def load_keras_embedding(filename):
     vocab_to_id, id_to_vocab, embeddings = load_glove_pickle(filename)
-    vocab_size, hidden_size = embeddings.shape
-    return Embedding(vocab_size, hidden_size, weights=embeddings, trainable=True)
+    vocab_size, embedding_size = embeddings.shape
+    return Embedding(vocab_size, embedding_size, weights=[embeddings], trainable=True), vocab_size, embedding_size
 

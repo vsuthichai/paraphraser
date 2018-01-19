@@ -32,6 +32,8 @@ def synonym_model(s):
             pos = wn.VERB
         elif token.pos_ == 'ADV' and len(token.text) >= 3:
             pos = wn.ADV
+        elif token.pos_ == 'ADJ' and len(token.text) >= 3:
+            pos = wn.ADJ
         else:
             continue
 
@@ -46,7 +48,7 @@ def synonym_model(s):
 
     count = sum([ len(words) for words in index_to_lemmas.values() ])
 
-    for i in xrange(min(count, 30)):
+    for i in xrange(min(count, 40)):
         new_tokens = []
         for index, words in sorted(index_to_lemmas.items(), key=lambda x: x[0]):
             token = random.sample(index_to_lemmas[index], 1)[0]
@@ -63,6 +65,7 @@ def synonym_paraphrase(s):
 if __name__ == '__main__':
     #x = synonym_model('I am discussing my homework with the teacher.')
     #x = synonym_model('the rabbit quickly ran down the hole')
-    x = synonym_model('John tried to fix his computer by hacking away at it.')
+    #x = synonym_model('John tried to fix his computer by hacking away at it.')
+    x = synonym_model('team based multiplayer online first person shooter video game')
     print(x)
 
