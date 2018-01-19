@@ -1,11 +1,20 @@
 from setuptools import setup, find_packages
 from codecs import open
 from os import path
+from setuptools.command.install import install
 
 here = path.abspath(path.dirname(__file__))
 
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_desc = f.read()
+
+class DownloadCorpora(install):
+    def run(self):
+        install.run(self)
+        import spacy
+        import nltk
+        nltk.download('wordnet')
+        spacy.cli.download('download', 'en')
 
 setup(
     name='paraphraser',
@@ -42,6 +51,9 @@ setup(
     },
     data_files=[],
     entry_points={
+    },
+    cmdclass={
+        'install': DownloadCorpora
     }
 )
 
