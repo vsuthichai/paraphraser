@@ -1,3 +1,4 @@
 build/
 dist/
 paraphraser.egg-info/
+__pycache__/
