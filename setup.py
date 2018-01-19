@@ -33,7 +33,7 @@ setup(
 
     py_modules=['paraphraser.synonym_model'],
     #packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    install_requires=[],
+    install_requires=['nltk', 'spacy', 'ipython'],
     extras_require={
 
     },
