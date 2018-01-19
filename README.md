@@ -12,3 +12,5 @@ Run the following command from within your virtual environment:
 ```
 pip install git+git://github.com/vsuthichai/paraphraser.git
 ```
+
+![Example](/images/example.png)
