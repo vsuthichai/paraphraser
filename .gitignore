@@ -2,6 +2,6 @@ build/
 dist/
 paraphraser.egg-info/
 __pycache__/
-.pyc
-.swp
+*.pyc
+*.swp
 nohup.out
