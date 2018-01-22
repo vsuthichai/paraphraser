@@ -1,7 +1,5 @@
 from nlp_pipeline import nlp_pipeline
-
-def tokens_to_id(tokens, word_to_id, unk_id): #, src_or_ref=, unk_id, start_id, end_id):
-    return [ word_to_id.get(token, unk_id) for token in tokens ] 
+from math import ceil
 
 def generate_batch(batch_size, word_to_id, start_id, end_id, unk_id):
     i = 0
@@ -16,12 +14,11 @@ def generate_batch(batch_size, word_to_id, start_id, end_id, unk_id):
         for line in f:
             source, ref = line.split('\t')
 
-            source_tokens = nlp_pipeline(source.strip())
-            ref_tokens = nlp_pipeline(ref.strip())
+            source_ids = nlp_pipeline(source, word_to_id, unk_id)
+            ref_ids = nlp_pipeline(ref, word_to_id, unk_id)
 
-            source_ids = tokens_to_id(source_tokens, word_to_id, unk_id)
-            target_ids = tokens_to_id(ref_tokens, word_to_id, unk_id) + [end_id]
-            ref_ids = [start_id] + target_ids
+            ref_ids = [start_id] + ref_ids + [end_id]
+            target_ids = ref_ids[1:]
 
             source_len = len(source_ids)
             ref_len = len(ref_ids)
@@ -44,11 +41,40 @@ def generate_batch(batch_size, word_to_id, start_id, end_id, unk_id):
                 batch_ref_lengths = []
                 batch_target_lengths = []
 
+    '''
+    num_batches = ceil(len(batch_source_ids) / batch_size)
+
+    for i in xrange(num_batches):
+        yield (batch_source_ids[i, i+batch_size], 
+              batch_ref_ids[i, i+batch_size], 
+              batch_target_ids[i, i+batch_size], 
+              batch_source_lengths[i, i+batch_size], 
+              batch_ref_lengths[i, i+batch_size], 
+              batch_target_lengths[i, i+batch_size])    
+    '''
+
+def keras_generate_batch(batch_size, word_to_id, start_id, end_id, unk_id):
+    generator = generate_batch(batch_size, word_to_id, start_id, end_id, unk_id)
+
+    while 1:
+        source_ids, ref_ids, target_ids, source_len, ref_len, target_len = next(generator)
+
+        encoder_input_data = np.array(pad_sequences(source_ids, maxlen=args.max_encoder_tokens, padding='post', value=mask_id))
+        decoder_input_data = np.array(pad_sequences(ref_ids, maxlen=args.max_decoder_tokens, padding='post', value=mask_id))
+        decoder_target_data = np.array(pad_sequences(target_ids, maxlen=args.max_decoder_tokens, padding='post', value=mask_id))
+
+        one_hot_decoder_target_data = np.zeros((args.batch_size, args.max_decoder_tokens, vocab_size))
+        for i in xrange(decoder_target_data.shape[0]):
+            for j in xrange(args.max_decoder_tokens):
+                one_hot_decoder_target_data[i, j, decoder_target_data[i][j]] = 1
+
+        yield ([source_ids, ref_ids], one_hot_decoder_target_data)
+
 if __name__ == '__main__':
     from load_sent_embeddings import load_sentence_embeddings
     word_to_id, idx_to_word, _, start_id, end_id, unk_id  = load_sentence_embeddings()
-    #print(start_id, end_id, unk_id)
-    for source_ids, ref_ids, target_ids, source_lengths, ref_lengths, target_lengths in generate_batch(2, word_to_id, 20, start_id, end_id, unk_id):
+    print(start_id, end_id, unk_id)
+    for source_ids, ref_ids, target_ids, source_lengths, ref_lengths, target_lengths in generate_batch(2, word_to_id, start_id, end_id, unk_id):
         print(source_ids)
         print(ref_ids)
         print(target_ids)
