@@ -40,8 +40,9 @@ def lstm_keras(args, embeddings, mask_val):
     decoder_outputs = TimeDistributed(Dense(vocab_size, activation='softmax'))(decoder_lstm)
 
     model = Model(inputs=[encoder_inputs, decoder_inputs], outputs=decoder_outputs)
-    optimizer = Adam(lr=1e-3, clipnorm=5.)
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy')
+    #optimizer = Adam(lr=1e-3, clipnorm=5.)
+    optimizer = Adam(lr=1e-3)
+    model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy')
     return model
 
 def parse_arguments():
@@ -50,8 +51,8 @@ def parse_arguments():
     parser.add_argument('--log_dir', type=str, help="Log directory to store tensorboard summary and model checkpoints")
     parser.add_argument('--epochs', type=int, default=1, help="Number of epochs to train")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
-    parser.add_argument('--batch_size', type=int, default=64, help="Mini batch size")
-    parser.add_argument('--hidden_size', type=int, default=512, help="Hidden dimension size")
+    parser.add_argument('--batch_size', type=int, default=16, help="Mini batch size")
+    parser.add_argument('--hidden_size', type=int, default=64, help="Hidden dimension size")
     parser.add_argument('--dropout', type=float, default=0.2, help="Hidden dimension size")
     parser.add_argument('--max_encoder_tokens', type=int, default=30, help="Max number of encoder sequence tokens")
     parser.add_argument('--max_decoder_tokens', type=int, default=30, help="Max number of decoder sequence tokens")
@@ -66,7 +67,7 @@ def main():
     model = lstm_keras(args, embeddings, mask_id)
     model.summary()
 
-    dataset_generator = ParaphraseDataset('/media/sdb/datasets/para-nmt-5m-processed/para-nmt-5m-processed.txt', embeddings, word_to_id)
+    dataset_generator = ParaphraseDataset('/home/victor/datasets/para-nmt-5m-processed/para-nmt-5m-processed.txt', embeddings, word_to_id)
     generator = dataset_generator.generate_batch(args.batch_size, start_id, end_id, unk_id, mask_id, args.max_encoder_tokens, args.max_decoder_tokens)
     steps_per_epoch = dataset_generator.dataset_size / args.batch_size
 
@@ -77,5 +78,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
