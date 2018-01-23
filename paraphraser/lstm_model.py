@@ -5,13 +5,14 @@ import numpy as np
 from tensorflow.python.layers import core as layers_core
 
 
-def lstm_model(args, np_embeddings, mode='train'):
+def lstm_model(args, np_embeddings, mask_id, mode='train'):
     vocab_size, hidden_size = np_embeddings.shape
 
     # Embeddings
     with tf.variable_scope('embeddings'):
         encoder_embeddings = tf.get_variable(name="encoder_embeddings", shape=np_embeddings.shape, initializer=tf.constant_initializer(np_embeddings), trainable=True)
         decoder_embeddings = tf.get_variable(name="decoder_embeddings", shape=np_embeddings.shape, initializer=tf.constant_initializer(np_embeddings), trainable=True)
+        #embeddings = tf.get_variable(name="embeddings", shape=np_embeddings.shape, initializer=tf.constant_initializer(np_embeddings), trainable=True)
 
     # Define placeholders
     with tf.variable_scope('placeholders'):
@@ -19,7 +20,9 @@ def lstm_model(args, np_embeddings, mode='train'):
         seq_source_lengths = tf.placeholder(tf.int32, [None], name="sequence_source_lengths")
         seq_reference_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="reference_ids")
         seq_reference_lengths = tf.placeholder(tf.int32, [None], name="sequence_reference_lengths")
-        seq_output_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="output_ids")
+        #seq_output_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="output_ids")
+        paddings = tf.constant([[0, 0], [0, 1]])
+        seq_output_ids = tf.pad(seq_reference_ids[:, 1:], paddings, mode="CONSTANT", name="seq_output_ids", constant_values=mask_id)
 
     batch_size = tf.cast(tf.shape(seq_source_ids)[0], tf.float32)
 
@@ -29,8 +32,17 @@ def lstm_model(args, np_embeddings, mode='train'):
 
     # Encoder
     with tf.variable_scope('encoder'):
-        encoder_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size)
-        encoder_outputs, encoder_states = tf.nn.dynamic_rnn(cell=encoder_cell, inputs=encoder_embedding, sequence_length=seq_source_lengths, dtype=tf.float32)
+        encoder_fw_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size)
+        encoder_bw_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size)
+        encoder_outputs, encoder_states = tf.nn.bidirectional_dynamic_rnn(cell_fw=encoder_fw_cell, 
+                                                                          cell_bw=encoder_bw_cell,
+                                                                          inputs=encoder_embedding, 
+                                                                          sequence_length=seq_source_lengths, 
+                                                                          dtype=tf.float32)
+        encoder_fw_state, encoder_bw_state = encoder_states
+        encoder_state_c = tf.concat((encoder_fw_state.c, encoder_bw_state.c), axis=1, name="encoder_state_c")
+        encoder_state_h = tf.concat((encoder_fw_state.h, encoder_bw_state.h), axis=1, name="encoder_state_h")
+        joined_encoder_state = tf.contrib.rnn.LSTMStateTuple(encoder_state_c, encoder_state_h)
 
     # Decoder embeddings
     with tf.variable_scope('decoder_embedding'):
@@ -40,23 +52,34 @@ def lstm_model(args, np_embeddings, mode='train'):
     if mode == 'train':
         # Decoder
         with tf.variable_scope('decoder'):
-            decoder_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size)
-            projection_layer = layers_core.Dense(vocab_size, use_bias=False)
+            decoder_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2)
             helper = tf.contrib.seq2seq.TrainingHelper(decoder_embedding, seq_reference_lengths)
-            decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, helper, encoder_states)
+            fc_layer = layers_core.Dense(vocab_size, use_bias=False)
+            decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, helper, joined_encoder_state, fc_layer)
             final_outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder, swap_memory=True)
-            logits = projection_layer(final_outputs.rnn_output)
-            sample_id = final_outputs.sample_id
+            logits = final_outputs.rnn_output
+            predictions = final_outputs.sample_id
 
         with tf.variable_scope('train_loss'):
             max_output_len = tf.shape(logits)[1]
-            pad = tf.fill((tf.shape(seq_output_ids)[0], args.max_seq_length), -1)
+            pad = tf.fill((tf.shape(seq_output_ids)[0], args.max_seq_length), -1) #mask_id
             boolean_mask = tf.not_equal(seq_output_ids, pad)
             mask = tf.cast(boolean_mask, tf.float32)[:, :max_output_len]
             labels = tf.reshape(seq_output_ids[:, :max_output_len], shape=(-1, 1))
             crossent = tf.nn.softmax_cross_entropy_with_logits(labels=tf.one_hot(labels, vocab_size), logits=logits)
             #crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+            #print(crossent.shape)
             train_loss = (tf.reduce_sum(crossent * mask) / batch_size)
+
+            #targets = tf.reshape(seq_output_ids, [-1])
+            #logits_flat = tf.reshape(logits, [-1, vocab_size])
+            #crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=targets, logits=logits_flat)
+            #train_loss = (tf.reduce_sum(crossent) / batch_size)
+
+        with tf.variable_scope('summaries'):
+            tf.summary.scalar("loss", train_loss)
+            summaries = tf.summary.merge_all()
+
     # Test
     elif mode == 'test':
         with tf.variable_scope('infer'):
@@ -77,12 +100,17 @@ def lstm_model(args, np_embeddings, mode='train'):
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,
         'seq_reference_lengths': seq_reference_lengths,
-        'seq_output_ids': seq_output_ids,
+        #'seq_output_ids': seq_output_ids,
+
+        'final_sequence_lengths': final_sequence_lengths,
+
         'embedding_source': encoder_embedding,
         'encoder_states': encoder_states,
+
         'loss': train_loss,
         'logits': logits,
-        'sample_id': sample_id,
+        'predictions': predictions,
         'labels': labels,
+        'summaries': summaries
     }
 
