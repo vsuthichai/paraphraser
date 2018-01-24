@@ -16,8 +16,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
     # Define placeholders
     with tf.variable_scope('placeholders'):
-        max_seq_source_len = tf.placeholder(tf.int32, shape=(), name="max_seq_source_len")
-        max_seq_ref_len = tf.placeholder(tf.int32, shape=(), name="max_seq_ref_len")
+        lr = tf.placeholder(tf.float32, shape=(), name="learning_rate")
         seq_source_ids = tf.placeholder(tf.int32, shape=(None, None), name="source_ids")
         seq_source_lengths = tf.placeholder(tf.int32, [None], name="sequence_source_lengths")
         seq_reference_ids = tf.placeholder(tf.int32, shape=(None, None), name="reference_ids")
@@ -64,16 +63,20 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
         with tf.variable_scope('train_loss'):
             max_output_len = tf.shape(logits)[1]
+            seq_output_ids = seq_output_ids[:, :max_output_len]
             #pad = tf.fill((tf.shape(seq_output_ids)[0], args.max_seq_length), -1) #mask_id
             pad = tf.fill((tf.shape(seq_output_ids)[0], max_output_len), -1) #mask_id
             boolean_mask = tf.not_equal(seq_output_ids, pad)
-            mask = tf.cast(boolean_mask, tf.float32)[:, :max_output_len]
-            labels = tf.reshape(seq_output_ids[:, :max_output_len], shape=(-1, 1))
+            mask = tf.cast(boolean_mask, tf.float32)
+            #labels = tf.reshape(seq_output_ids[:, :max_output_len], shape=(-1, 1))
+            labels = tf.reshape(seq_output_ids, shape=(-1, 1))
             crossent = tf.nn.softmax_cross_entropy_with_logits(labels=tf.one_hot(labels, vocab_size), logits=logits)
             train_loss = (tf.reduce_sum(crossent * mask) / batch_size)
 
+        train_step = tf.train.AdamOptimizer(lr).minimize(train_loss)
+
         with tf.variable_scope('summaries'):
-            tf.summary.scalar("loss", train_loss)
+            tf.summary.scalar("batch_loss", train_loss)
             summaries = tf.summary.merge_all()
 
     # Test
@@ -92,8 +95,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
 
     return {
-        'max_seq_source_len': max_seq_source_len,
-        'max_seq_ref_len': max_seq_ref_len,
+        'lr': lr,
         'seq_source_ids': seq_source_ids,
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,
@@ -109,6 +111,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
         'logits': logits,
         'predictions': predictions,
         'labels': labels,
-        'summaries': summaries
+        'summaries': summaries,
+        'train_step': train_step
     }
 

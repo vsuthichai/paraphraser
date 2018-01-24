@@ -52,10 +52,10 @@ class ParaphraseDataset(object):
 
                 for line in f:
                     source_words, source_ids, ref_words, ref_ids = line.split('\t')
-                    batch_source_words.append(source_words.split(' '))
-                    batch_source_ids.append(source_ids.split(' '))
-                    batch_ref_words.append(ref_words.split(' '))
-                    batch_ref_ids.append(ref_ids.split(' '))
+                    batch_source_words.append(source_words.strip().split(' '))
+                    batch_source_ids.append(source_ids.strip().split(' '))
+                    batch_ref_words.append(ref_words.strip().split(' '))
+                    batch_ref_ids.append(ref_ids.strip().split(' '))
 
                     if len(batch_source_words) != batch_size:
                         continue
@@ -84,10 +84,10 @@ class ParaphraseDataset(object):
                     batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
 
                     yield {
-                        'seq_source_ids': batch_source_ids,
+                        'seq_source_ids': self.pad_batch(batch_source_ids, length),
                         'seq_source_words': batch_source_words,
                         'seq_source_len': batch_source_len,
-                        'seq_ref_ids': batch_ref_ids,
+                        'seq_ref_ids': self.pad_batch(batch_ref_ids, length),
                         'seq_ref_words': batch_ref_words,
                         'seq_ref_len': batch_ref_len
                     }
