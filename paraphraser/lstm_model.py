@@ -25,7 +25,8 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
         paddings = tf.constant([[0, 0], [0, 1]])
         seq_output_ids = tf.pad(seq_reference_ids[:, 1:], paddings, mode="CONSTANT", name="seq_output_ids", constant_values=mask_id)
 
-    batch_size = tf.cast(tf.shape(seq_source_ids)[0], tf.float32)
+    #batch_size = tf.cast(tf.shape(seq_source_ids)[0], tf.float32)
+    batch_size = tf.shape(seq_source_ids)[0]
 
     # Encoder embeddings
     with tf.variable_scope('encoder_embedding'):
@@ -40,6 +41,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
                                                                           inputs=encoder_embedding, 
                                                                           sequence_length=seq_source_lengths, 
                                                                           dtype=tf.float32)
+        concat_encoder_outputs = tf.concat(encoder_outputs, 2)
         encoder_fw_state, encoder_bw_state = encoder_states
         encoder_state_c = tf.concat((encoder_fw_state.c, encoder_bw_state.c), axis=1, name="encoder_state_c")
         encoder_state_h = tf.concat((encoder_fw_state.h, encoder_bw_state.h), axis=1, name="encoder_state_h")
@@ -53,10 +55,15 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
         # Decoder
         with tf.variable_scope('decoder'):
+            attention = tf.contrib.seq2seq.BahdanauAttention(num_units=args.hidden_size, memory=concat_encoder_outputs)
             decoder_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2)
+            attn_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention, attention_layer_size=args.hidden_size)
+            #out_cell = tf.contrib.rnn.OutputProjectionWrapper(attn_cell, vocab_size)
             helper = tf.contrib.seq2seq.TrainingHelper(decoder_embedding, seq_reference_lengths)
             fc_layer = layers_core.Dense(vocab_size, use_bias=False)
-            decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, helper, joined_encoder_state, fc_layer)
+            #decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, joined_encoder_state, fc_layer)
+            zero_state = attn_cell.zero_state(batch_size, tf.float32)
+            decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, attn_cell.zero_state(batch_size, tf.float32).clone(cell_state=joined_encoder_state), fc_layer)
             final_outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder, swap_memory=True)
             logits = final_outputs.rnn_output
             predictions = final_outputs.sample_id
@@ -71,7 +78,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
             #labels = tf.reshape(seq_output_ids[:, :max_output_len], shape=(-1, 1))
             labels = tf.reshape(seq_output_ids, shape=(-1, 1))
             crossent = tf.nn.softmax_cross_entropy_with_logits(labels=tf.one_hot(labels, vocab_size), logits=logits)
-            train_loss = (tf.reduce_sum(crossent * mask) / batch_size)
+            train_loss = (tf.reduce_sum(crossent * mask) / tf.cast(batch_size, tf.float32))
 
         train_step = tf.train.AdamOptimizer(lr).minimize(train_loss)
 
