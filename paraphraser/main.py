@@ -150,9 +150,9 @@ def main():
                     bleu_pred_words = [ [ id_to_vocab[vocab_id] for vocab_id in prediction if vocab_id in id_to_vocab ] for prediction in predictions ]
                     bleu_pred_words = [ pred_words[:pred_words.index('<END>') if '<END>' in pred_words else len(pred_words) ] for pred_words in bleu_pred_words ]
                     bleu_score = corpus_bleu(seq_ref_words, bleu_pred_words, smoothing_function=chencherry.method1)
-                    summarize_scalar(train_writer, 'train_bleu_score', bleu_score, global_step)
+                    summarize_scalar(train_writer, 'bleu_score', bleu_score, global_step)
                     train_loss = sum(train_losses) / len(train_losses)
-                    summarize_scalar(train_writer, 'train_loss', train_loss, global_step)
+                    summarize_scalar(train_writer, 'loss', train_loss, global_step)
                     print("{} : step={} epoch={} batch_loss={:.4f} train_loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), global_step, epoch, batch_loss, train_loss, bleu_score), flush=True)
 
                 if global_step % 1000 == 0:
@@ -206,8 +206,8 @@ def main():
 
                         bleu_score = corpus_bleu(dev_seq_ref_words, dev_bleu_pred_words, smoothing_function=chencherry.method1)
 
-                    summarize_scalar(dev_writer, 'dev_bleu_score', bleu_score, global_step)
-                    summarize_scalar(dev_writer, 'dev_loss', sum(dev_batch_losses) / len(dev_batch_losses), global_step)
+                    summarize_scalar(dev_writer, 'bleu_score', bleu_score, global_step)
+                    summarize_scalar(dev_writer, 'loss', sum(dev_batch_losses) / len(dev_batch_losses), global_step)
                     dev_writer.flush()
                     print("{} : Validation set validation_loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), sum(dev_batch_losses) / len(dev_batch_losses), bleu_score), flush=True)
                 
