@@ -36,7 +36,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--log_dir', type=str, default="logs", help="Log directory to store tensorboard summary and model checkpoints")
-    parser.add_argument('--epochs', type=int, default=2000, help="Number of epochs to train")
+    parser.add_argument('--epochs', type=int, default=1, help="Number of epochs to train")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--batch_size', type=int, default=64, help="Mini batch size")
     parser.add_argument('--max_seq_length', type=int, default=40, help="Maximum sequence length.  Sentence lengths beyond this are truncated.")
@@ -56,9 +56,46 @@ def main():
     mask_id = 5800
     vocab_size, embedding_size = embeddings.shape
 
-    dataset_generator = ParaphraseDataset('/home/victor/datasets/para-nmt-5m-processed/para-nmt-5m-processed.txt', embeddings, word_to_id,
-                                          start_id, end_id, unk_id, mask_id, args.max_seq_length, args.max_seq_length)
-    steps_per_epoch = dataset_generator.dataset_size / args.batch_size
+    dataset = [
+        { 
+            'maxlen': 5,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.5',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.5',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.5' 
+        },
+        { 
+            'maxlen': 10,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.10',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.10',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.10' 
+        },
+        { 
+            'maxlen': 20,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.20',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.20',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.20' 
+        },
+        { 
+            'maxlen': 30,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.30',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.30',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.30' 
+        },
+        { 
+            'maxlen': 40,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.40',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.40',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.40' 
+        },
+        { 
+            'maxlen': 50,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.50',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.50',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.50' 
+        }
+    ]
+
+    dataset_generator = ParaphraseDataset(dataset, embeddings, word_to_id, start_id, end_id, unk_id, mask_id)
     start = dt.datetime.now()
     logdir = os.path.join(args.log_dir, "train-" + start.strftime("%Y%m%d-%H%M%S"))
 
@@ -73,8 +110,8 @@ def main():
         global_step = 0
 
         for epoch in xrange(args.epochs):
-            generator = dataset_generator.generate_batch_tf(args.batch_size)
-            d = next(generator)
+            generator = dataset_generator.generate_batch(args.batch_size, 'train', 10)
+            #d = next(generator)
             #while 1:
             for d in generator:
                 seq_source_ids = d['seq_source_ids']
@@ -84,14 +121,19 @@ def main():
                 seq_ref_words = d['seq_ref_words']
                 seq_ref_len = d['seq_ref_len']
 
+                max_seq_source_len = max([len(source_ids) for source_ids in seq_source_ids ])
+                max_seq_ref_len = max([len(ref_ids) for ref_ids in seq_ref_ids ])
+
                 #debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
                 #return
 
                 feed_dict = {
+                    model['max_seq_source_len']: max_seq_source_len,
                     model['seq_source_ids']: seq_source_ids,
-                    model['seq_reference_ids']: seq_ref_ids,
-                    #model['seq_output_ids']: seq_out_ids,
                     model['seq_source_lengths']: seq_source_len,
+
+                    model['max_seq_ref_len']: max_seq_ref_len,
+                    model['seq_reference_ids']: seq_ref_ids,
                     model['seq_reference_lengths']: seq_ref_len
                 }
 

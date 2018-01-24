@@ -1,30 +1,22 @@
 import numpy as np
-from nlp_pipeline import nlp_pipeline, openmp_nlp_pipeline
 from keras.preprocessing.sequence import pad_sequences
 from load_sent_embeddings import load_sentence_embeddings
 from six.moves import xrange
+from six import iteritems
 from random import shuffle
 
 class ParaphraseDataset(object):
-    def __init__(self, path, embeddings, word_to_id, start_id, end_id, unk_id, mask_id, max_encoder_tokens, max_decoder_tokens):
+    def __init__(self, dataset_metadata, embeddings, word_to_id, start_id, end_id, unk_id, mask_id):
         i = 0
+
+        # dataset
+        self.lengths = sorted([ v for d in dataset_metadata for k, v in iteritems(d) if k == 'maxlen' ])
+        self.dataset = {}
+        for dm in dataset_metadata:
+            for k, v in iteritems(dm):
+                if k == 'maxlen':
+                    self.dataset[v] = dm
         
-        # Shuffle dataset
-        with open(path, 'r') as f:
-            self.lines = [ line for line in f ]
-        shuffle(self.lines)
-
-        # Create validation set
-        self.validation_set = self.lines[-256:]
-        self.lines = self.lines[:-256]
-
-        # Main training dataset
-        self.dataset_size = len(self.lines)
-        self.validation = len(self.validation_set)
-
-        # Path to dataset
-        self.path = path
-
         # Word embeddings, vocab
         self.embeddings = embeddings
         self.word_to_id = word_to_id
@@ -35,86 +27,70 @@ class ParaphraseDataset(object):
         self.end_id = end_id
         self.unk_id = unk_id
         self.mask_id = mask_id
-        self.max_encoder_tokens = max_encoder_tokens
-        self.max_decoder_tokens = max_decoder_tokens
 
-    def generate_dev_batch_tf(self, batch_size):
-        batch_source = []
-        batch_ref = []
+    def pad_batch(self, batch_ids, max_len):
+        padded_batch = np.array(pad_sequences(batch_ids, maxlen=max_len, padding='post', value=self.mask_id))
+        return padded_batch
 
-        for i, line in enumerate(self.validation_set):
-            source, ref = line.split('\t')
+    def generate_batch(self, batch_size, dataset_type, length=None):
+        if dataset_type not in set(['train', 'test', 'dev']):
+            raise ValueError("Invalid dataset type.")
 
-            batch_source.append(source.strip())
-            batch_ref.append(ref.strip())
+        if length == None:
+            lengths = self.lengths
+        else:
+            lengths = [ length ]
 
-            if len(batch_source) % batch_size != 0:
-                continue
+        for length in lengths:
+            with open(self.dataset[length][dataset_type], 'r') as f:
+                batch_source_words = []
+                batch_source_ids = []
+                batch_source_len = []
+                batch_ref_words = []
+                batch_ref_ids = []
+                batch_ref_len = []
 
-            batch_source_ids, batch_source = openmp_nlp_pipeline(batch_source, self.word_to_id, self.unk_id)
-            batch_ref_ids_, batch_ref = openmp_nlp_pipeline(batch_ref, self.word_to_id, self.unk_id)
+                for line in f:
+                    source_words, source_ids, ref_words, ref_ids = line.split('\t')
+                    batch_source_words.append(source_words.split(' '))
+                    batch_source_ids.append(source_ids.split(' '))
+                    batch_ref_words.append(ref_words.split(' '))
+                    batch_ref_ids.append(ref_ids.split(' '))
 
-            batch_source, batch_ref, batch_source_ids, batch_ref_ids_ = self.check_seq_len(self.max_encoder_tokens, batch_source, batch_ref, batch_source_ids, batch_ref_ids_)
+                    if len(batch_source_words) != batch_size:
+                        continue
 
-            batch_ref_ids = [ [self.start_id] + ref_ids + [self.end_id] for ref_ids in batch_ref_ids_ ]
+                    batch_source_len = [ len(source_ids) for source_ids in batch_source_ids ]
+                    batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
 
-            batch_source_len = [ len(source_ids) for source_ids in batch_source_ids ]
-            batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
+                    yield {
+                        'seq_source_ids': self.pad_batch(batch_source_ids, length),
+                        'seq_source_words': batch_source_words,
+                        'seq_source_len': batch_source_len,
+                        'seq_ref_ids': self.pad_batch(batch_ref_ids, length),
+                        'seq_ref_words': batch_ref_words,
+                        'seq_ref_len': batch_ref_len,
+                    }
 
-            encoder_input_data, decoder_input_data = self.encode_batch(batch_size, batch_source_ids, batch_ref_ids)
+                    batch_source_words = []
+                    batch_source_ids = []
+                    batch_source_len = []
+                    batch_ref_words = []
+                    batch_ref_ids = []
+                    batch_ref_len = []
 
-            yield {
-                'seq_source_ids': encoder_input_data,
-                'seq_ref_ids': decoder_input_data,
-                'seq_ref_words': batch_ref,
-                'seq_source_len': batch_source_len,
-                'seq_ref_len': batch_ref_len,
-            }
-            #yield (encoder_input_data, decoder_input_data, one_hot_decoder_target_data, batch_source_len, batch_ref_len, batch_target_len)
+                if len(batch_source_words) > 0:
+                    batch_source_len = [ len(source_ids) for source_ids in batch_source_ids ]
+                    batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
 
-            batch_source = []
-            batch_ref = []
-
-    def generate_batch_tf(self, batch_size):
-        batch_source = []
-        batch_ref = []
-
-        for i, line in enumerate(self.lines):
-            source, ref = line.split('\t')
-
-            batch_source.append(source.strip())
-            batch_ref.append(ref.strip())
-
-            if len(batch_source) % batch_size != 0:
-                continue
-
-            # NLP Pipleine
-            batch_source_ids, batch_source_words = openmp_nlp_pipeline(batch_source, self.word_to_id, self.unk_id)
-            batch_ref_ids_, batch_ref_words = openmp_nlp_pipeline(batch_ref, self.word_to_id, self.unk_id)
-
-            # Create reference, preprend start id, append end id
-            batch_ref_ids = [ [self.start_id] + ref_ids + [self.end_id] for ref_ids in batch_ref_ids_ ]
-
-            # Check sequence length, truncate if it exceeds max len
-            batch_source_words, batch_ref_words, batch_source_ids, batch_ref_ids = self.check_seq_len(self.max_encoder_tokens, batch_source_words, batch_ref_words, batch_source_ids, batch_ref_ids)
-
-            batch_source_len = [ len(source_ids) for source_ids in batch_source_ids ]
-            batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
-
-            encoder_input_data, decoder_input_data = self.encode_batch(batch_source_ids, batch_ref_ids)
-
-            yield {
-                'seq_source_ids': encoder_input_data,
-                'seq_source_words': batch_source_words,
-                'seq_source_len': batch_source_len,
-                'seq_ref_ids': decoder_input_data,
-                'seq_ref_words': batch_ref,
-                'seq_ref_len': batch_ref_len,
-            }
-            #yield (encoder_input_data, decoder_input_data, one_hot_decoder_target_data, batch_source_len, batch_ref_len, batch_target_len)
-
-            batch_source = []
-            batch_ref = []
+                    yield {
+                        'seq_source_ids': batch_source_ids,
+                        'seq_source_words': batch_source_words,
+                        'seq_source_len': batch_source_len,
+                        'seq_ref_ids': batch_ref_ids,
+                        'seq_ref_words': batch_ref_words,
+                        'seq_ref_len': batch_ref_len
+                    }
 
     def check_seq_len(self, max_tokens, batch_source_words, batch_ref_words, batch_source_ids, batch_ref_ids):
         for source_words in batch_source_words:
@@ -128,27 +104,62 @@ class ParaphraseDataset(object):
 
         return batch_source_words, batch_ref_words, batch_source_ids, batch_ref_ids
 
-    def encode_batch(self, source_ids, ref_ids):
-        encoder_input_data = np.array(pad_sequences(source_ids, maxlen=self.max_encoder_tokens, padding='post', value=self.mask_id))
-        decoder_input_data = np.array(pad_sequences(ref_ids, maxlen=self.max_decoder_tokens, padding='post', value=self.mask_id))
-
-        return encoder_input_data, decoder_input_data
-        #return encoder_input_data, decoder_input_data, np.expand_dims(decoder_target_data, -1)
-
-        #one_hot_decoder_target_data = (np.arange(self.vocab_size) == decoder_target_data[...,None]).astype(int)
-        #return encoder_input_data, decoder_input_data, one_hot_decoder_target_data
-
 if __name__ == '__main__':
-    import datetime as dt
+    from pprint import pprint as pp
+    dataset = [
+        { 
+            'maxlen': 5,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.5',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.5',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.5' 
+        },
+        { 
+            'maxlen': 10,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.10',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.10',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.10' 
+        },
+        { 
+            'maxlen': 20,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.20',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.20',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.20' 
+        },
+        { 
+            'maxlen': 30,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.30',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.30',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.30' 
+        },
+        { 
+            'maxlen': 40,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.40',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.40',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.40' 
+        },
+        { 
+            'maxlen': 50,
+            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.50',
+            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.50',
+            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.50' 
+        }
+    ]
     word_to_id, idx_to_word, embeddings, start_id, end_id, unk_id = load_sentence_embeddings()
-    dataset = ParaphraseDataset('/media/sdb/datasets/para-nmt-5m-processed/para-nmt-5m-processed.txt', embeddings, word_to_id)
-    d = dataset.generate_batch(1, start_id, end_id, unk_id, 5800, 30, 30)
-    for [encoder_input_data, decoder_input_data], one_hot_decoder_target_data in d:
-        print(encoder_input_data.shape)
-        print(encoder_input_data, flush=True)
-        print(decoder_input_data.shape)
-        print(decoder_input_data, flush=True)
-        print(one_hot_decoder_target_data.shape, flush=True)
-        print(one_hot_decoder_target_data, flush=True)
-        break
+    pd = ParaphraseDataset(dataset, embeddings, word_to_id, start_id, end_id, unk_id, mask_id=5800)
+    generator = pd.generate_batch(5, 'train', 30)
+    d = next(generator)
+
+    print("=== seq source ids ===")
+    print(d['seq_source_ids'].shape, flush=True)
+    print(d['seq_source_ids'], flush=True)
+    for i in d['seq_source_words']:
+        print(i)
+    print(d['seq_source_len'], flush=True)
+
+    print("=== seq ref ids ===")
+    print(d['seq_ref_ids'].shape, flush=True)
+    print(d['seq_ref_ids'], flush=True)
+    for i in d['seq_ref_words']:
+        print(i)
+    print(d['seq_ref_len'])
 

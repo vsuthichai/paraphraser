@@ -16,10 +16,10 @@ def nlp_pipeline_0(sentence):
 def mp_nlp_pipeline(pool, lines):
     return pool.map(nlp_pipeline_0, lines, 1)
 
-def openmp_nlp_pipeline(lines, word_to_id, unk_id, n_threads=1):
-    docs = [ doc for doc in nlp.pipe(lines, n_threads=n_threads, disable=['parser', 'tagger', 'ner']) ]
-    return ([ [ word_to_id.get(token.lower_, unk_id) for token in doc ] for doc in docs ],
-           [ [ token.lower_ for token in doc ] for doc in docs ])
+def openmp_nlp_pipeline(lines, n_threads=12):
+    return [ [ token.lower_ for token in doc ] for doc in nlp.pipe(lines, n_threads=n_threads, disable=['parser', 'tagger', 'ner']) ]
+    #return ([ [ word_to_id.get(token.lower_, unk_id) for token in doc ] for doc in docs ],
+           #[ [ token.lower_ for token in doc ] for doc in docs ])
 
 def single_thread_nlp_pipeline(lines):
     return [ nlp(line) for line in lines ]

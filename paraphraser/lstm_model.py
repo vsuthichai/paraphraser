@@ -16,9 +16,11 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
     # Define placeholders
     with tf.variable_scope('placeholders'):
-        seq_source_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="source_ids")
+        max_seq_source_len = tf.placeholder(tf.int32, shape=(), name="max_seq_source_len")
+        max_seq_ref_len = tf.placeholder(tf.int32, shape=(), name="max_seq_ref_len")
+        seq_source_ids = tf.placeholder(tf.int32, shape=(None, None), name="source_ids")
         seq_source_lengths = tf.placeholder(tf.int32, [None], name="sequence_source_lengths")
-        seq_reference_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="reference_ids")
+        seq_reference_ids = tf.placeholder(tf.int32, shape=(None, None), name="reference_ids")
         seq_reference_lengths = tf.placeholder(tf.int32, [None], name="sequence_reference_lengths")
         #seq_output_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="output_ids")
         paddings = tf.constant([[0, 0], [0, 1]])
@@ -44,12 +46,12 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
         encoder_state_h = tf.concat((encoder_fw_state.h, encoder_bw_state.h), axis=1, name="encoder_state_h")
         joined_encoder_state = tf.contrib.rnn.LSTMStateTuple(encoder_state_c, encoder_state_h)
 
-    # Decoder embeddings
-    with tf.variable_scope('decoder_embedding'):
-        decoder_embedding = tf.nn.embedding_lookup(decoder_embeddings, seq_reference_ids, name="decoder_embedding")
-
     # Train
     if mode == 'train':
+        # Decoder embeddings
+        with tf.variable_scope('decoder_embedding'):
+            decoder_embedding = tf.nn.embedding_lookup(decoder_embeddings, seq_reference_ids, name="decoder_embedding")
+
         # Decoder
         with tf.variable_scope('decoder'):
             decoder_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2)
@@ -62,19 +64,13 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
         with tf.variable_scope('train_loss'):
             max_output_len = tf.shape(logits)[1]
-            pad = tf.fill((tf.shape(seq_output_ids)[0], args.max_seq_length), -1) #mask_id
+            #pad = tf.fill((tf.shape(seq_output_ids)[0], args.max_seq_length), -1) #mask_id
+            pad = tf.fill((tf.shape(seq_output_ids)[0], max_output_len), -1) #mask_id
             boolean_mask = tf.not_equal(seq_output_ids, pad)
             mask = tf.cast(boolean_mask, tf.float32)[:, :max_output_len]
             labels = tf.reshape(seq_output_ids[:, :max_output_len], shape=(-1, 1))
             crossent = tf.nn.softmax_cross_entropy_with_logits(labels=tf.one_hot(labels, vocab_size), logits=logits)
-            #crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
-            #print(crossent.shape)
             train_loss = (tf.reduce_sum(crossent * mask) / batch_size)
-
-            #targets = tf.reshape(seq_output_ids, [-1])
-            #logits_flat = tf.reshape(logits, [-1, vocab_size])
-            #crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=targets, logits=logits_flat)
-            #train_loss = (tf.reduce_sum(crossent) / batch_size)
 
         with tf.variable_scope('summaries'):
             tf.summary.scalar("loss", train_loss)
@@ -96,6 +92,8 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
 
     return {
+        'max_seq_source_len': max_seq_source_len,
+        'max_seq_ref_len': max_seq_ref_len,
         'seq_source_ids': seq_source_ids,
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,

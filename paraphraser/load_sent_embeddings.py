@@ -22,11 +22,6 @@ def load_sentence_embeddings():
 
         return word_to_id, idx_to_word, word_embeddings, word_to_id['<START>'], word_to_id['<END>'], word_to_id['UUUNKKK']
 
-def load_keras_embedding():
-    word_to_id, idx_to_word, embeddings, start_id, end_id, unk_id  = load_sentence_embeddings()
-    vocab_size, embedding_size = embeddings.shape
-    return Embedding(vocab_size, embedding_size, weights=[embeddings], trainable=True), vocab_size, embedding_size, start_id, end_id, unk_id
-
 if __name__ == '__main__':
     word_to_id, idx_to_word, embedding, start_id, end_id, unk_id  = load_sentence_embeddings()
     from pprint import pprint as pp
