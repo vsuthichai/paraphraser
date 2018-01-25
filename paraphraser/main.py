@@ -87,7 +87,7 @@ def main():
         }
     ]
 
-    dataset_generator = ParaphraseDataset(dataset, embeddings, word_to_id, start_id, end_id, unk_id, mask_id)
+    dataset_generator = ParaphraseDataset(dataset, args.batch_size, embeddings, word_to_id, start_id, end_id, unk_id, mask_id)
     start = dt.datetime.now()
     train_logdir = os.path.join(args.log_dir, "train-" + start.strftime("%Y%m%d-%H%M%S"))
     dev_logdir = os.path.join(args.log_dir, "dev-" + start.strftime("%Y%m%d-%H%M%S"))
@@ -104,7 +104,7 @@ def main():
 
         for epoch in xrange(args.epochs):
             train_losses = []
-            train_batch_generator = dataset_generator.generate_batch(args.batch_size, 'train')
+            train_batch_generator = dataset_generator.generate_batch('train')
             #d = next(generator)
             #while 1:
             for train_batch in train_batch_generator:
@@ -166,8 +166,8 @@ def main():
                         print(str(len(prediction)) + ' ' + ' '.join([id_to_vocab[vocab_id] for vocab_id in prediction if vocab_id in id_to_vocab]))
 
                 if global_step % 1000 == 0 and global_step != 0:
-                    #dev_batch_generator = dataset_generator.generate_batch(args.batch_size, 'dev')
-                    dev_batch_generator = dataset_generator.generate_batch(64, 'dev')
+                    #dev_batch_generator = dataset_generator.generate_batch('dev')
+                    dev_batch_generator = dataset_generator.generate_batch('dev')
                     dev_batch_losses = []
                     dev_predictions = []
                     dev_seq_ref_words = []
