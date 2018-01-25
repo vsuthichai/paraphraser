@@ -24,6 +24,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
         #seq_output_ids = tf.placeholder(tf.int32, shape=(None, args.max_seq_length), name="output_ids")
         paddings = tf.constant([[0, 0], [0, 1]])
         seq_output_ids = tf.pad(seq_reference_ids[:, 1:], paddings, mode="CONSTANT", name="seq_output_ids", constant_values=mask_id)
+        keep_prob = tf.placeholder_with_default(1.0, shape=())
 
     #batch_size = tf.cast(tf.shape(seq_source_ids)[0], tf.float32)
     batch_size = tf.shape(seq_source_ids)[0]
@@ -34,8 +35,8 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
     # Encoder
     with tf.variable_scope('encoder'):
-        encoder_fw_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size)
-        encoder_bw_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size)
+        encoder_fw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+        encoder_bw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
         encoder_outputs, encoder_states = tf.nn.bidirectional_dynamic_rnn(cell_fw=encoder_fw_cell, 
                                                                           cell_bw=encoder_bw_cell,
                                                                           inputs=encoder_embedding, 
@@ -56,12 +57,10 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
         # Decoder
         with tf.variable_scope('decoder'):
             attention = tf.contrib.seq2seq.BahdanauAttention(num_units=args.hidden_size, memory=concat_encoder_outputs)
-            decoder_cell = tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2)
+            decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
             attn_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention, attention_layer_size=args.hidden_size)
-            #out_cell = tf.contrib.rnn.OutputProjectionWrapper(attn_cell, vocab_size)
             helper = tf.contrib.seq2seq.TrainingHelper(decoder_embedding, seq_reference_lengths)
             fc_layer = layers_core.Dense(vocab_size, use_bias=False)
-            #decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, joined_encoder_state, fc_layer)
             zero_state = attn_cell.zero_state(batch_size, tf.float32)
             decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, attn_cell.zero_state(batch_size, tf.float32).clone(cell_state=joined_encoder_state), fc_layer)
             final_outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder, swap_memory=True)
@@ -71,11 +70,9 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
         with tf.variable_scope('train_loss'):
             max_output_len = tf.shape(logits)[1]
             seq_output_ids = seq_output_ids[:, :max_output_len]
-            #pad = tf.fill((tf.shape(seq_output_ids)[0], args.max_seq_length), -1) #mask_id
             pad = tf.fill((tf.shape(seq_output_ids)[0], max_output_len), -1) #mask_id
             boolean_mask = tf.not_equal(seq_output_ids, pad)
             mask = tf.cast(boolean_mask, tf.float32)
-            #labels = tf.reshape(seq_output_ids[:, :max_output_len], shape=(-1, 1))
             labels = tf.reshape(seq_output_ids, shape=(-1, 1))
             crossent = tf.nn.softmax_cross_entropy_with_logits(labels=tf.one_hot(labels, vocab_size), logits=logits)
             train_loss = (tf.reduce_sum(crossent * mask) / tf.cast(batch_size, tf.float32))
@@ -103,6 +100,7 @@ def lstm_model(args, np_embeddings, mask_id, mode='train'):
 
     return {
         'lr': lr,
+        'keep_prob': keep_prob,
         'seq_source_ids': seq_source_ids,
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,

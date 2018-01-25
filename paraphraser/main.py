@@ -38,6 +38,7 @@ def parse_arguments():
     parser.add_argument('--batch_size', type=int, default=64, help="Mini batch size")
     parser.add_argument('--max_seq_length', type=int, default=40, help="Maximum sequence length.  Sentence lengths beyond this are truncated.")
     parser.add_argument('--hidden_size', type=int, default=300, help="Hidden dimension size")
+    parser.add_argument('--keep_prob', type=float, default=0.8, help="Keep probability for dropout")
 
     return parser.parse_args()
 
@@ -123,7 +124,8 @@ def main():
                     model['seq_source_ids']: seq_source_ids,
                     model['seq_source_lengths']: seq_source_len,
                     model['seq_reference_ids']: seq_ref_ids,
-                    model['seq_reference_lengths']: seq_ref_len
+                    model['seq_reference_lengths']: seq_ref_len,
+                    model['keep_prob']: args.keep_prob
                 }
 
                 feeds = [
