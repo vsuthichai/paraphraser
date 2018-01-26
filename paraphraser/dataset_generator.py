@@ -29,9 +29,9 @@ class ParaphraseDataset(object):
                 if k == 'maxlen':
                     self.dataset_metadata[v] = dm
         self.dataset = {}
-        self.load_dataset_into_memory('train')
-        self.load_dataset_into_memory('dev')
-        self.load_dataset_into_memory('test')
+        #self.load_dataset_into_memory('train')
+        #self.load_dataset_into_memory('dev')
+        #self.load_dataset_into_memory('test')
 
     def load_dataset_into_memory(self, dataset_type):
         if dataset_type not in set(['train', 'test', 'dev']):
@@ -102,6 +102,9 @@ class ParaphraseDataset(object):
     def generate_batch(self, dataset_type):
         if dataset_type not in set(['train', 'test', 'dev']):
             raise ValueError("Invalid dataset type.")
+
+        if dataset_type not in self.dataset:
+            self.load_dataset_into_memory(dataset_type)
 
         dataset_size = len(self.dataset[dataset_type]['all_source_ids'])
         print(dataset_size)
