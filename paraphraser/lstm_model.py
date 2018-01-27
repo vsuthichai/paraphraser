@@ -109,8 +109,8 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode='train'):
                 embedding=decoder_embeddings,
                 start_tokens=start_tokens,
                 end_token=end_id,
+                initial_state=tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width),
                 #initial_state=decoder_initial_state,
-                initial_state=decoder_initial_state,
                 beam_width=beam_width,
                 output_layer=fc_layer,
                 length_penalty_weight=length_penalty_weight)
