@@ -107,8 +107,8 @@ def infer(sess, model, mode, decoder, id_to_vocab, end_id):
         ]
 
         predictions, final_sequence_lengths = sess.run(feeds, feed_dict)
-        print(predictions)
-        print(final_sequence_lengths)
+        #print(predictions)
+        #print(final_sequence_lengths)
 
         if decoder == 'beam':
             _, sentence_length, num_samples = predictions.shape
