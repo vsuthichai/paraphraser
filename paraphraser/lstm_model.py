@@ -5,8 +5,9 @@ import numpy as np
 from tensorflow.python.layers import core as layers_core
 
 
-def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode='train'):
+def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
     vocab_size, hidden_size = np_embeddings.shape
+    beam_width = args.beam_width
 
     # Embeddings
     with tf.variable_scope('embeddings'):
@@ -34,51 +35,49 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode='train'):
     #batch_size = tf.cast(tf.shape(seq_source_ids)[0], tf.float32)
     batch_size = tf.shape(seq_source_ids)[0]
 
-    # Encoder embeddings
-    with tf.variable_scope('encoder_embedding'):
-        encoder_embedding = tf.nn.embedding_lookup(encoder_embeddings, seq_source_ids, name="encoder_embedding")
-
     # Encoder
-    with tf.variable_scope('encoder'):
-        encoder_fw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
-        encoder_bw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
-        encoder_outputs, encoder_states = tf.nn.bidirectional_dynamic_rnn(cell_fw=encoder_fw_cell, 
-                                                                          cell_bw=encoder_bw_cell,
-                                                                          inputs=encoder_embedding, 
-                                                                          sequence_length=seq_source_lengths, 
-                                                                          dtype=tf.float32)
-        concat_encoder_outputs = tf.concat(encoder_outputs, 2)
-        encoder_fw_state, encoder_bw_state = encoder_states
-        encoder_state_c = tf.concat((encoder_fw_state.c, encoder_bw_state.c), axis=1, name="encoder_state_c")
-        encoder_state_h = tf.concat((encoder_fw_state.h, encoder_bw_state.h), axis=1, name="encoder_state_h")
-        joined_encoder_state = tf.contrib.rnn.LSTMStateTuple(encoder_state_c, encoder_state_h)
+    #with tf.variable_scope('encoder'):
+    encoder_embedding = tf.nn.embedding_lookup(encoder_embeddings, seq_source_ids, name="encoder_embedding")
+    encoder_fw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+    encoder_bw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+    encoder_outputs, encoder_states = tf.nn.bidirectional_dynamic_rnn(cell_fw=encoder_fw_cell, 
+                                                                      cell_bw=encoder_bw_cell,
+                                                                      inputs=encoder_embedding, 
+                                                                      sequence_length=seq_source_lengths, 
+                                                                      dtype=tf.float32)
+    concat_encoder_outputs = tf.concat(encoder_outputs, 2)
+    encoder_fw_state, encoder_bw_state = encoder_states
+    encoder_state_c = tf.concat((encoder_fw_state.c, encoder_bw_state.c), axis=1, name="encoder_state_c")
+    encoder_state_h = tf.concat((encoder_fw_state.h, encoder_bw_state.h), axis=1, name="encoder_state_h")
+    joined_encoder_state = tf.contrib.rnn.LSTMStateTuple(encoder_state_c, encoder_state_h)
 
-    # Decoder embeddings
+    fc_layer = layers_core.Dense(vocab_size, use_bias=False)
+    attention = tf.contrib.seq2seq.BahdanauAttention(num_units=args.hidden_size, memory=concat_encoder_outputs)
+    decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+    attn_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention, attention_layer_size=args.hidden_size)
+    zero_state = attn_cell.zero_state(batch_size, tf.float32)
+    decoder_initial_state = zero_state.clone(cell_state=joined_encoder_state)
+
+    tiled_joined_encoder_state = tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width)
+    tiled_concat_encoder_outputs = tf.contrib.seq2seq.tile_batch(concat_encoder_outputs, multiplier=beam_width)
+    beam_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+        num_units=args.hidden_size,
+        memory=tiled_concat_encoder_outputs)
+    #decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=1.0, output_keep_prob=1.0)
+    beam_attn_wrapper = tf.contrib.seq2seq.AttentionWrapper(
+        cell=tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2),
+        attention_mechanism=beam_attention_mechanism, 
+        attention_layer_size=args.hidden_size)
+
+    # Train, dev, test
     if mode in set(['train', 'dev', 'test']):
-        with tf.variable_scope('decoder_embedding'):
-            decoder_embedding = tf.nn.embedding_lookup(decoder_embeddings, seq_reference_ids, name="decoder_embedding")
-
-    with tf.variable_scope('decoder'):
-        fc_layer = layers_core.Dense(vocab_size, use_bias=False)
-        attention = tf.contrib.seq2seq.BahdanauAttention(num_units=args.hidden_size, memory=concat_encoder_outputs)
-        decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
-        attn_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention, attention_layer_size=args.hidden_size)
-        zero_state = attn_cell.zero_state(batch_size, tf.float32)
-        decoder_initial_state = zero_state.clone(cell_state=joined_encoder_state)
-
-    # Train
-    if mode in set(['train', 'dev', 'test']):
-        # Decoder embeddings
-        with tf.variable_scope('decoder_embedding'):
-            decoder_embedding = tf.nn.embedding_lookup(decoder_embeddings, seq_reference_ids, name="decoder_embedding")
-
         # Decoder
-        with tf.variable_scope('decoder'):
-            helper = tf.contrib.seq2seq.TrainingHelper(decoder_embedding, seq_reference_lengths)
-            decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, decoder_initial_state, fc_layer)
-            final_outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder, swap_memory=True)
-            logits = final_outputs.rnn_output
-            predictions = final_outputs.sample_id
+        decoder_embedding = tf.nn.embedding_lookup(decoder_embeddings, seq_reference_ids, name="decoder_embedding")
+        helper = tf.contrib.seq2seq.TrainingHelper(decoder_embedding, seq_reference_lengths)
+        decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, decoder_initial_state, fc_layer)
+        final_outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder, swap_memory=True)
+        logits = final_outputs.rnn_output
+        predictions = final_outputs.sample_id
 
         with tf.variable_scope('train_loss'):
             max_output_len = tf.shape(logits)[1]
@@ -106,30 +105,14 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode='train'):
 
         # Beach search decoder
         if args.decoder == 'beam':
-            beam_width = args.beam_width
-
             assert(beam_width > 0)
 
-            tiled_joined_encoder_state = tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width)
-            tiled_concat_encoder_outputs = tf.contrib.seq2seq.tile_batch(concat_encoder_outputs, multiplier=beam_width)
-
-            attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-                num_units=args.hidden_size,
-                memory=tiled_concat_encoder_outputs)
-
-            decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=1.0, output_keep_prob=1.0)
-
-            attn_wrapper = tf.contrib.seq2seq.AttentionWrapper(
-                cell=decoder_cell,
-                attention_mechanism=attention_mechanism, 
-                attention_layer_size=args.hidden_size)
-
             decoder = tf.contrib.seq2seq.BeamSearchDecoder(
-                cell=attn_wrapper,
+                cell=beam_attn_wrapper,
                 embedding=decoder_embeddings,
                 start_tokens=start_tokens,
                 end_token=end_id,
-                initial_state=attn_wrapper.zero_state(batch_size * beam_width, tf.float32).clone(cell_state=tiled_joined_encoder_state),
+                initial_state=beam_attn_wrapper.zero_state(batch_size * beam_width, tf.float32).clone(cell_state=tiled_joined_encoder_state),
                 beam_width=beam_width,
                 output_layer=fc_layer,
                 length_penalty_weight=0.0)

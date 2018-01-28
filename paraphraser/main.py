@@ -44,9 +44,6 @@ def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
         seq_ref_words = batch['seq_ref_words']
         seq_ref_len = batch['seq_ref_len']
 
-        #debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
-        #return
-
         feed_dict = {
             model['seq_source_ids']: seq_source_ids,
             model['seq_source_lengths']: seq_source_len,
@@ -110,37 +107,19 @@ def infer(sess, model, mode, id_to_vocab, end_id):
         ]
 
         predictions, final_sequence_lengths = sess.run(feeds, feed_dict)
+        print(predictions)
+        print(final_sequence_lengths)
 
         for sent_pred in predictions:
             if sent_pred[-1] == end_id:
                 sent_pred = sent_pred[0:-1]
             print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
         
-def restore_old():
-    name_to_var_map = {var.op.name: var for var in tf.global_variables()}
-    name_to_var_map['decoder/decoder/attention_wrapper/bahdanau_attention/attention_v'] = name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/attention_v']
-    name_to_var_map['decoder/decoder/attention_wrapper/attention_layer/kernel'] = name_to_var_map['decoder_1/attention_wrapper/attention_layer/kernel']
-    name_to_var_map['decoder/decoder/attention_wrapper/bahdanau_attention/query_layer/kernel'] = name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel']
-    name_to_var_map['decoder/decoder/attention_wrapper/basic_lstm_cell/bias'] = name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/bias']
-    name_to_var_map['decoder/decoder/dense/kernel'] = name_to_var_map['decoder_1/dense/kernel']
-    name_to_var_map['decoder/decoder/attention_wrapper/basic_lstm_cell/kernel'] = name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/kernel']
-
-    del name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/attention_v']
-    del name_to_var_map['decoder_1/attention_wrapper/attention_layer/kernel']
-    del name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel']
-    del name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/bias']
-    del name_to_var_map['decoder_1/dense/kernel']
-    del name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/kernel']
-
-    # Saver object
-    saver = tf.train.Saver(name_to_var_map)
-    return saver
-
 def parse_arguments():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--log_dir', type=str, default="logs", help="Log directory to store tensorboard summary and model checkpoints")
-    parser.add_argument('--epochs', type=int, default=2, help="Number of epochs to train")
+    parser.add_argument('--epochs', type=int, default=3, help="Number of epochs to train")
     parser.add_argument('--lr', type=float, default=1e-3, help="Learning rate")
     parser.add_argument('--batch_size', type=int, default=64, help="Mini batch size")
     parser.add_argument('--max_seq_length', type=int, default=40, help="Maximum sequence length.  Sentence lengths beyond this are truncated.")
@@ -208,8 +187,11 @@ def main():
         model = lstm_model(args, embeddings, start_id, end_id, mask_id, args.mode)
 
         # Saver object
-        saver = tf.train.Saver(name_to_var_map)
-        #saver = tf.train.Saver()
+        saver = tf.train.Saver()
+
+        name_to_var_map = {var.op.name: var for var in tf.global_variables()}
+        from pprint import pprint as pp
+        pp(name_to_var_map)
 
         # Restore checkpoint
         if args.checkpoint:
@@ -242,9 +224,9 @@ def main():
         dev_logdir = os.path.join(args.log_dir, "dev-" + start.strftime("%Y%m%d-%H%M%S"))
         dev_writer = tf.summary.FileWriter(dev_logdir)
 
-        tf.global_variables_initializer().run()
         chencherry = SmoothingFunction()
         global_step = 0
+        tf.global_variables_initializer().run()
 
         for epoch in xrange(args.epochs):
             train_losses = []
@@ -303,6 +285,7 @@ def main():
                 # Print predictions for this batch every 1000 steps
                 # Evaluate on dev set
                 if global_step % 1000 == 0:
+                #if global_step % 300 == 0:
                     debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
                     print("PREDICTIONS!")
                     print("logits shape: " + str(logits.shape))
@@ -319,6 +302,7 @@ def main():
 
                 # Checkpoint.
                 if global_step % 5000 == 0 and global_step != 0:
+                #if global_step % 100 == 0 and global_step != 0:
                     saver.save(sess, os.path.join(train_logdir, 'model'), global_step=global_step)
 
                 global_step += 1
