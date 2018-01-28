@@ -98,59 +98,67 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode='train'):
 
     # Test
     elif mode == 'infer':
-        beam_width = args.beam_width
-        length_penalty_weight = 0.0
+        loss = None
+        train_step = None
+        labels = None
+        summaries = None
         start_tokens = tf.fill([batch_size], start_id)
 
         # Beach search decoder
-        if beam_width > 0:
+        if args.decoder == 'beam':
+            beam_width = args.beam_width
+
+            assert(beam_width > 0)
+
+            tiled_joined_encoder_state = tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width)
+            tiled_concat_encoder_outputs = tf.contrib.seq2seq.tile_batch(concat_encoder_outputs, multiplier=beam_width)
+
+            attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+                num_units=args.hidden_size,
+                memory=tiled_concat_encoder_outputs)
+
+            decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=1.0, output_keep_prob=1.0)
+
+            attn_wrapper = tf.contrib.seq2seq.AttentionWrapper(
+                cell=decoder_cell,
+                attention_mechanism=attention_mechanism, 
+                attention_layer_size=args.hidden_size)
+
             decoder = tf.contrib.seq2seq.BeamSearchDecoder(
-                cell=attn_cell,
+                cell=attn_wrapper,
                 embedding=decoder_embeddings,
                 start_tokens=start_tokens,
                 end_token=end_id,
-                initial_state=tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width),
-                #initial_state=decoder_initial_state,
+                initial_state=attn_wrapper.zero_state(batch_size * beam_width, tf.float32).clone(cell_state=tiled_joined_encoder_state),
                 beam_width=beam_width,
                 output_layer=fc_layer,
-                length_penalty_weight=length_penalty_weight)
-        else:
-            # Helper
+                length_penalty_weight=0.0)
+
+        # Distribution sampling
+        elif args.decoder == 'sample':
             sampling_temperature = args.sampling_temperature
-            if sampling_temperature > 0.0:
-                helper = tf.contrib.seq2seq.SampleEmbeddingHelper(
-                    decoder_embeddings, start_tokens, end_id,
-                    softmax_temperature=sampling_temperature)
-                    #seed=hparams.random_seed)
-            else:
-                helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-                    decoder_embeddings, start_tokens, end_id)
+            assert(sampling_temperature > 0.0)
+            helper = tf.contrib.seq2seq.SampleEmbeddingHelper(decoder_embeddings, start_tokens, end_id, softmax_temperature=sampling_temperature)
+            decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, decoder_initial_state, output_layer=fc_layer)
 
-            # Decoder
-            decoder = tf.contrib.seq2seq.BasicDecoder(
-                attn_cell,
-                helper,
-                decoder_initial_state,
-                output_layer=fc_layer # applied per timestep
-            )
+        # Greedy argmax decoder
+        elif args.decoder == 'greedy':
+            helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(decoder_embeddings, start_tokens, end_id)
+            # applied per timestep
+            decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, decoder_initial_state, output_layer=fc_layer)
 
-        # Dynamic decoding
+        # Decode!
         outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(
             decoder,
             #maximum_iterations=maximum_iterations,
             swap_memory=True)
 
-        if beam_width > 0:
+        if args.decoder == 'beam':
             logits = tf.no_op()
             predictions = outputs.predicted_ids
         else:
             logits = outputs.rnn_output
             predictions = outputs.sample_id
-
-        loss = None
-        train_step = None
-        labels = None
-        summaries = None
 
     return {
         'lr': lr,
@@ -159,7 +167,6 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode='train'):
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,
         'seq_reference_lengths': seq_reference_lengths,
-        #'seq_output_ids': seq_output_ids,
 
         'final_state': final_state,
         'final_sequence_lengths': final_sequence_lengths,

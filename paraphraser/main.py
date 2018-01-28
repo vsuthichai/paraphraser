@@ -146,9 +146,10 @@ def parse_arguments():
     parser.add_argument('--max_seq_length', type=int, default=40, help="Maximum sequence length.  Sentence lengths beyond this are truncated.")
     parser.add_argument('--hidden_size', type=int, default=300, help="Hidden dimension size")
     parser.add_argument('--keep_prob', type=float, default=0.8, help="Keep probability for dropout")
-    parser.add_argument('--beam_width', type=int, default=0, help="Beam width")
+    parser.add_argument('--decoder', type=str, choices=['beam', 'greedy', 'sample'], help="Decoder type")
+    parser.add_argument('--beam_width', type=int, default=5, help="Beam width")
     parser.add_argument('--sampling_temperature', type=float, default=0.0, help="Sampling temperature")
-    parser.add_argument('--mode', type=str, default=None, help='train or dev or test or infer')
+    parser.add_argument('--mode', type=str, default=None, choices=['train', 'dev', 'test', 'infer'], help='train or dev or test or infer')
     parser.add_argument('--checkpoint', type=str, default=None, help="Model checkpoint file")
 
     return parser.parse_args()
