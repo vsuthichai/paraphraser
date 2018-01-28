@@ -116,6 +116,25 @@ def infer(sess, model, mode, id_to_vocab, end_id):
                 sent_pred = sent_pred[0:-1]
             print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
         
+def restore_old():
+    name_to_var_map = {var.op.name: var for var in tf.global_variables()}
+    name_to_var_map['decoder/decoder/attention_wrapper/bahdanau_attention/attention_v'] = name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/attention_v']
+    name_to_var_map['decoder/decoder/attention_wrapper/attention_layer/kernel'] = name_to_var_map['decoder_1/attention_wrapper/attention_layer/kernel']
+    name_to_var_map['decoder/decoder/attention_wrapper/bahdanau_attention/query_layer/kernel'] = name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel']
+    name_to_var_map['decoder/decoder/attention_wrapper/basic_lstm_cell/bias'] = name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/bias']
+    name_to_var_map['decoder/decoder/dense/kernel'] = name_to_var_map['decoder_1/dense/kernel']
+    name_to_var_map['decoder/decoder/attention_wrapper/basic_lstm_cell/kernel'] = name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/kernel']
+
+    del name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/attention_v']
+    del name_to_var_map['decoder_1/attention_wrapper/attention_layer/kernel']
+    del name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel']
+    del name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/bias']
+    del name_to_var_map['decoder_1/dense/kernel']
+    del name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/kernel']
+
+    # Saver object
+    saver = tf.train.Saver(name_to_var_map)
+    return saver
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -186,50 +205,12 @@ def main():
     with tf.Session() as sess:
         start = dt.datetime.now()
         model = lstm_model(args, embeddings, start_id, end_id, mask_id, args.mode)
-        from pprint import pprint as pp
-        name_to_var_map = {var.op.name: var for var in tf.global_variables()}
-        name_to_var_map['decoder/decoder/attention_wrapper/bahdanau_attention/attention_v'] = name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/attention_v']
-        name_to_var_map['decoder/decoder/attention_wrapper/attention_layer/kernel'] = name_to_var_map['decoder_1/attention_wrapper/attention_layer/kernel']
-        name_to_var_map['decoder/decoder/attention_wrapper/bahdanau_attention/query_layer/kernel'] = name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel']
-        name_to_var_map['decoder/decoder/attention_wrapper/basic_lstm_cell/bias'] = name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/bias']
-        name_to_var_map['decoder/decoder/dense/kernel'] = name_to_var_map['decoder_1/dense/kernel']
-        name_to_var_map['decoder/decoder/attention_wrapper/basic_lstm_cell/kernel'] = name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/kernel']
-
-        del name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/attention_v']
-        del name_to_var_map['decoder_1/attention_wrapper/attention_layer/kernel']
-        del name_to_var_map['decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel']
-        del name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/bias']
-        del name_to_var_map['decoder_1/dense/kernel']
-        del name_to_var_map['decoder_1/attention_wrapper/basic_lstm_cell/kernel']
-
-        '''
-        2018-01-25 22:59:51.890576: W tensorflow/core/framework/op_kernel.cc:1192] Not found: Key decoder_1/attention_wrapper/bahdanau_attention/attention_v not found in checkpoint
-        2018-01-25 22:59:51.892306: W tensorflow/core/framework/op_kernel.cc:1192] Not found: Key decoder_1/attention_wrapper/attention_layer/kernel not found in checkpoint
-        2018-01-25 22:59:51.893286: W tensorflow/core/framework/op_kernel.cc:1192] Not found: Key decoder_1/attention_wrapper/bahdanau_attention/query_layer/kernel not found in checkpoint
-        2018-01-25 22:59:51.893345: W tensorflow/core/framework/op_kernel.cc:1192] Not found: Key decoder_1/attention_wrapper/basic_lstm_cell/bias not found in checkpoint
-        2018-01-25 22:59:51.894636: W tensorflow/core/framework/op_kernel.cc:1192] Not found: Key decoder_1/dense/kernel not found in checkpoint
-        2018-01-25 22:59:51.894814: W tensorflow/core/framework/op_kernel.cc:1192] Not found: Key decoder_1/attention_wrapper/basic_lstm_cell/kernel not found in checkpoint
-        '''
-        '''
-        decoder/decoder/attention_wrapper/attention_layer/kernel (DT_FLOAT) [1200,300]
-        decoder/decoder/attention_wrapper/attention_layer/kernel/Adam (DT_FLOAT) [1200,300]
-        decoder/decoder/attention_wrapper/attention_layer/kernel/Adam_1 (DT_FLOAT) [1200,300]
-        decoder/decoder/attention_wrapper/bahdanau_attention/attention_v (DT_FLOAT) [300]
-        decoder/decoder/attention_wrapper/bahdanau_attention/attention_v/Adam (DT_FLOAT) [300]
-        decoder/decoder/attention_wrapper/bahdanau_attention/attention_v/Adam_1 (DT_FLOAT) [300]
-        decoder/decoder/attention_wrapper/bahdanau_attention/query_layer/kernel (DT_FLOAT) [600,300]
-        decoder/decoder/attention_wrapper/bahdanau_attention/query_layer/kernel/Adam (DT_FLOAT) [600,300]
-        decoder/decoder/attention_wrapper/bahdanau_attention/query_layer/kernel/Adam_1 (DT_FLOAT) [600,300]
-        decoder/decoder/attention_wrapper/basic_lstm_cell/bias (DT_FLOAT) [2400]
-        decoder/decoder/attention_wrapper/basic_lstm_cell/bias/Adam (DT_FLOAT) [2400]
-        decoder/decoder/attention_wrapper/basic_lstm_cell/bias/Adam_1 (DT_FLOAT) [2400]
-        decoder/decoder/attention_wrapper/basic_lstm_cell/kernel (DT_FLOAT) [1200,2400]
-        decoder/decoder/attention_wrapper/basic_lstm_cell/kernel/Adam (DT_FLOAT) [1200,2400]
-        decoder/decoder/attention_wrapper/basic_lstm_cell/kernel/Adam_1 (DT_FLOAT) [1200,2400]
-        '''
 
         # Saver object
         saver = tf.train.Saver(name_to_var_map)
+        #saver = tf.train.Saver()
+
+        # Restore checkpoint
         if args.checkpoint:
             saver.restore(sess, args.checkpoint)
 
