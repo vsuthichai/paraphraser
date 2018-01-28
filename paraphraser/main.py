@@ -88,7 +88,7 @@ def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
     print("{} : Evaluating on {} set loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), mode, loss, bleu_score), flush=True)
     return loss, bleu_score
 
-def infer(sess, model, mode, id_to_vocab, end_id):
+def infer(sess, model, mode, decoder, id_to_vocab, end_id):
     from preprocess_data import preprocess_batch
 
     while 1:
@@ -110,10 +110,24 @@ def infer(sess, model, mode, id_to_vocab, end_id):
         print(predictions)
         print(final_sequence_lengths)
 
-        for sent_pred in predictions:
-            if sent_pred[-1] == end_id:
-                sent_pred = sent_pred[0:-1]
-            print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
+        if decoder == 'beam':
+            _, sentence_length, num_samples = predictions.shape
+            for i in xrange(num_samples):
+                sent_pred = []
+                for j in xrange(sentence_length):
+                    sent_pred.append(predictions[0][j][i])
+                try:
+                    end_index = sent_pred.index(end_id)
+                    sent_pred = sent_pred[:end_index]
+                except Exception as e:
+                    pass
+                print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
+        else:
+            for sent_pred in predictions:
+                if sent_pred[-1] == end_id:
+                    sent_pred = sent_pred[0:-1]
+                print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
+            
         
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -209,7 +223,7 @@ def main():
 
         # Perform inferencing
         if args.mode == 'infer':
-            infer(sess, model, args.mode, id_to_vocab, end_id)
+            infer(sess, model, args.mode, args.decoder, id_to_vocab, end_id)
             return
 
         ###################################
