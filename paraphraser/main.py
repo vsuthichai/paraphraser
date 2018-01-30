@@ -128,6 +128,49 @@ def infer(sess, model, mode, decoder, id_to_vocab, end_id):
                     sent_pred = sent_pred[0:-1]
                 print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
             
+def minimal_graph(sess, args):
+    #from tensorflow.python.framework.graph_util import convert_variables_to_constants
+    from tensorflow.python.tools import freeze_graph 
+    from tensorflow.python.tools import optimize_for_inference_lib
+
+    #graph_def = sess.graph.as_graph_def()
+    #minimal_graph = convert_variables_to_constants(sess, graph_def, ['output'])
+    #tf.train.write_graph(minimal_graph, '/tmp', 'minimal_graph.proto', as_text=False)
+    #tf.train.write_graph(minimal_graph, '/tmp', 'minimal_graph.txt', as_text=True)
+
+    #saver = tf.train.Saver(tf.trainable_variables())
+    #saver.save(sess, '/tmp/model')
+
+    '''
+    tf.train.write_graph(sess.graph_def, '/tmp', 'model.pbtxt')
+
+    freeze_graph.freeze_graph(
+        input_graph='/tmp/model.pbtxt', 
+        input_saver='',
+        input_binary=False, 
+        input_checkpoint=args.checkpoint,
+        output_node_names='predictions',
+        restore_op_name='save/restore_all', 
+        filename_tensor_name='save/Const:0',
+        output_graph='/tmp/frozen_model.pb', 
+        clear_devices=True, 
+        initializer_nodes="")
+    '''
+
+    input_graph_def = tf.GraphDef()
+    with tf.gfile.Open('/tmp/frozen_model.pb', 'rb') as f:
+        data = f.read()
+        input_graph_def.ParseFromString(data)
+
+    output_graph_def = optimize_for_inference_lib.optimize_for_inference(
+        input_graph_def,
+        ['placeholders/source_ids', 'placeholders/sequence_source_lengths'],
+        ['predictions'],
+        tf.float32.as_datatype_enum)
+    
+    f = tf.gfile.FastGFile('/tmp/optimized_model.pb', "w")
+    f.write(output_graph_def.SerializeToString())
+
         
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -142,8 +185,9 @@ def parse_arguments():
     parser.add_argument('--decoder', type=str, choices=['beam', 'greedy', 'sample'], help="Decoder type")
     parser.add_argument('--beam_width', type=int, default=5, help="Beam width")
     parser.add_argument('--sampling_temperature', type=float, default=0.0, help="Sampling temperature")
-    parser.add_argument('--mode', type=str, default=None, choices=['train', 'dev', 'test', 'infer'], help='train or dev or test or infer')
+    parser.add_argument('--mode', type=str, default=None, choices=['train', 'dev', 'test', 'infer'], help='train or dev or test or infer or minimize')
     parser.add_argument('--checkpoint', type=str, default=None, help="Model checkpoint file")
+    parser.add_argument('--minimize_graph', type=bool, default=False, help="Save existing checkpoint to minimal graph")
 
     return parser.parse_args()
 
@@ -193,7 +237,7 @@ def main():
         }
     ]
 
-    if args.mode not in set(['train', 'dev', 'test', 'infer']):
+    if args.mode not in set(['train', 'dev', 'test', 'infer', 'minimize']):
         raise ValueError("{} is not a valid mode".format(args.mode))
 
     with tf.Session() as sess:
@@ -210,6 +254,11 @@ def main():
         # Restore checkpoint
         if args.checkpoint:
             saver.restore(sess, args.checkpoint)
+
+        # Save minimal graph
+        if args.minimize_graph:
+            minimal_graph(sess, args)
+            return
 
         # Load dataset only in train, dev, or test mode
         if args.mode in set(['train', 'dev', 'test']):
@@ -326,7 +375,7 @@ def main():
             lr /= 10.
         # End epoch
 
-        evaluate(sess, model, 'test')
+        evaluate(sess, model, dataset_generator, 'test', id_to_vocab)
     # End sess
 
 if __name__ == '__main__':

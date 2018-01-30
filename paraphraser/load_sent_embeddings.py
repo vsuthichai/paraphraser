@@ -25,4 +25,5 @@ def load_sentence_embeddings():
 if __name__ == '__main__':
     word_to_id, idx_to_word, embedding, start_id, end_id, unk_id  = load_sentence_embeddings()
     from pprint import pprint as pp
-    pp(word_to_id)
+    #pp(word_to_id)
+    print(embedding)

@@ -138,10 +138,10 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
 
         if args.decoder == 'beam':
             logits = tf.no_op()
-            predictions = outputs.predicted_ids
+            predictions = tf.identity(outputs.predicted_ids, name="predictions")
         else:
             logits = outputs.rnn_output
-            predictions = outputs.sample_id
+            predictions = tf.identity(outputs.sample_id, name="predictions")
 
     return {
         'lr': lr,
