@@ -88,7 +88,7 @@ def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
     print("{} : Evaluating on {} set loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), mode, loss, bleu_score), flush=True)
     return loss, bleu_score
 
-def infer(sess, model, mode, decoder, id_to_vocab, end_id):
+def infer(sess, args, model, id_to_vocab, end_id):
     from preprocess_data import preprocess_batch
 
     while 1:
@@ -96,9 +96,19 @@ def infer(sess, model, mode, decoder, id_to_vocab, end_id):
         seq_source_words, seq_source_ids = preprocess_batch([ source_sent ])
         seq_source_len = [ len(seq_source) for seq_source in seq_source_ids ]
 
+        if args.decoder == 'greedy':
+            decoder = 0
+        elif args.decoder == 'sample':
+            decoder = 1
+        #elif args.decoder == 'beam':
+            #decoder = 2
+
         feed_dict = {
             model['seq_source_ids']: seq_source_ids,
             model['seq_source_lengths']: seq_source_len,
+            model['decoder_technique']: decoder,
+            model['sampling_temperature']: args.sampling_temperature,
+            #model['beam_width']: args.beam_width
         }
 
         feeds = [
@@ -110,6 +120,7 @@ def infer(sess, model, mode, decoder, id_to_vocab, end_id):
         #print(predictions)
         #print(final_sequence_lengths)
 
+        '''
         if decoder == 'beam':
             _, sentence_length, num_samples = predictions.shape
             for i in xrange(num_samples):
@@ -122,11 +133,11 @@ def infer(sess, model, mode, decoder, id_to_vocab, end_id):
                 except Exception as e:
                     pass
                 print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
-        else:
-            for sent_pred in predictions:
-                if sent_pred[-1] == end_id:
-                    sent_pred = sent_pred[0:-1]
-                print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
+        '''
+        for sent_pred in predictions:
+            if sent_pred[-1] == end_id:
+                sent_pred = sent_pred[0:-1]
+            print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
             
 def minimal_graph(sess, args):
     #from tensorflow.python.framework.graph_util import convert_variables_to_constants
@@ -141,7 +152,6 @@ def minimal_graph(sess, args):
     #saver = tf.train.Saver(tf.trainable_variables())
     #saver.save(sess, '/tmp/model')
 
-    '''
     tf.train.write_graph(sess.graph_def, '/tmp', 'model.pbtxt')
 
     freeze_graph.freeze_graph(
@@ -155,13 +165,13 @@ def minimal_graph(sess, args):
         output_graph='/tmp/frozen_model.pb', 
         clear_devices=True, 
         initializer_nodes="")
-    '''
 
     input_graph_def = tf.GraphDef()
     with tf.gfile.Open('/tmp/frozen_model.pb', 'rb') as f:
         data = f.read()
         input_graph_def.ParseFromString(data)
 
+    '''
     output_graph_def = optimize_for_inference_lib.optimize_for_inference(
         input_graph_def,
         ['placeholders/source_ids', 'placeholders/sequence_source_lengths'],
@@ -170,6 +180,7 @@ def minimal_graph(sess, args):
     
     f = tf.gfile.FastGFile('/tmp/optimized_model.pb', "w")
     f.write(output_graph_def.SerializeToString())
+    '''
 
         
 def parse_arguments():
@@ -182,8 +193,8 @@ def parse_arguments():
     parser.add_argument('--max_seq_length', type=int, default=40, help="Maximum sequence length.  Sentence lengths beyond this are truncated.")
     parser.add_argument('--hidden_size', type=int, default=300, help="Hidden dimension size")
     parser.add_argument('--keep_prob', type=float, default=0.8, help="Keep probability for dropout")
-    parser.add_argument('--decoder', type=str, choices=['beam', 'greedy', 'sample'], help="Decoder type")
-    parser.add_argument('--beam_width', type=int, default=5, help="Beam width")
+    parser.add_argument('--decoder', type=str, choices=['greedy', 'sample'], help="Decoder type")
+    #parser.add_argument('--beam_width', type=int, default=5, help="Beam width")
     parser.add_argument('--sampling_temperature', type=float, default=0.0, help="Sampling temperature")
     parser.add_argument('--mode', type=str, default=None, choices=['train', 'dev', 'test', 'infer'], help='train or dev or test or infer or minimize')
     parser.add_argument('--checkpoint', type=str, default=None, help="Model checkpoint file")
@@ -272,7 +283,7 @@ def main():
 
         # Perform inferencing
         if args.mode == 'infer':
-            infer(sess, model, args.mode, args.decoder, id_to_vocab, end_id)
+            infer(sess, args, model, id_to_vocab, end_id)
             return
 
         ###################################
@@ -319,13 +330,12 @@ def main():
                     model['train_step'], 
                     model['loss'], 
                     model['predictions'], 
-                    model['logits'], 
                     model['summaries'],
                     model['final_sequence_lengths']
                 ]
 
                 try:
-                    _, batch_loss, predictions, logits, summary, fsl = sess.run(feeds, feed_dict)
+                    _, batch_loss, predictions, summary, fsl = sess.run(feeds, feed_dict)
                 except Exception as e:
                     debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
                     raise e
@@ -351,7 +361,7 @@ def main():
                 #if global_step % 300 == 0:
                     debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
                     print("PREDICTIONS!")
-                    print("logits shape: " + str(logits.shape))
+                    # print("logits shape: " + str(logits.shape))
                     print("final_seq_lengths: " + str(fsl))
                     print("len(predictions): " + str(len(predictions)))
                     #print("predictions: " + str(predictions))

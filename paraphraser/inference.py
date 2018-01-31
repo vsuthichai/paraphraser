@@ -33,6 +33,7 @@ def infer(sess, model, decoder, id_to_vocab, end_id):
         feed_dict = {
             model['seq_source_ids']: seq_source_ids,
             model['seq_source_lengths']: seq_source_len,
+            #model['decoder_technique']: 0
         }
 
         feeds = [
@@ -61,15 +62,19 @@ def main():
 
         seq_source_ids = graph.get_tensor_by_name('import/placeholders/source_ids:0')
         seq_source_lengths = graph.get_tensor_by_name('import/placeholders/sequence_source_lengths:0')
+        #decoder_technique = graph.get_tensor_by_name('import/placeholders/decoder_technique:0')
 
         with tf.Session(graph=graph) as sess:
             model = {
                 'seq_source_ids': seq_source_ids,
                 'seq_source_lengths': seq_source_lengths,
-                'predictions': predictions
+                'predictions': predictions,
+                #'decoder_technique': decoder_technique
             }
 
             infer(sess, model, 'sample', idx_to_word, end_id)
 
 if __name__ == '__main__':
     main()
+
+

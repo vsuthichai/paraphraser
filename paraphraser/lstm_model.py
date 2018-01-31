@@ -7,7 +7,6 @@ from tensorflow.python.layers import core as layers_core
 
 def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
     vocab_size, hidden_size = np_embeddings.shape
-    beam_width = args.beam_width
 
     # Embeddings
     with tf.variable_scope('embeddings'):
@@ -21,6 +20,10 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         seq_source_ids = tf.placeholder(tf.int32, shape=(None, None), name="source_ids")
         seq_source_lengths = tf.placeholder(tf.int32, [None], name="sequence_source_lengths")
         keep_prob = tf.placeholder_with_default(1.0, shape=())
+        # 0: greedy, 1: sampling, 2: beam
+        decoder_technique = tf.placeholder_with_default(1, shape=(), name="decoder_technique")
+        sampling_temperature = tf.placeholder_with_default(0.5, shape=(), name="sampling_temperature")
+        #beam_width = tf.placeholder_with_default(5, shape=(), name="beam_width")
 
         if args.mode in set(['train', 'dev', 'test']):
             seq_reference_ids = tf.placeholder(tf.int32, shape=(None, None), name="reference_ids")
@@ -58,6 +61,7 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
     zero_state = attn_cell.zero_state(batch_size, tf.float32)
     decoder_initial_state = zero_state.clone(cell_state=joined_encoder_state)
 
+    '''
     tiled_joined_encoder_state = tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width)
     tiled_concat_encoder_outputs = tf.contrib.seq2seq.tile_batch(concat_encoder_outputs, multiplier=beam_width)
     beam_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
@@ -68,6 +72,7 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         cell=tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2),
         attention_mechanism=beam_attention_mechanism, 
         attention_layer_size=args.hidden_size)
+    '''
 
     # Train, dev, test
     if mode in set(['train', 'dev', 'test']):
@@ -104,61 +109,80 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         start_tokens = tf.fill([batch_size], start_id)
 
         # Beach search decoder
-        if args.decoder == 'beam':
-            assert(beam_width > 0)
-
-            decoder = tf.contrib.seq2seq.BeamSearchDecoder(
-                cell=beam_attn_wrapper,
-                embedding=decoder_embeddings,
-                start_tokens=start_tokens,
-                end_token=end_id,
-                initial_state=beam_attn_wrapper.zero_state(batch_size * beam_width, tf.float32).clone(cell_state=tiled_joined_encoder_state),
-                beam_width=beam_width,
-                output_layer=fc_layer,
-                length_penalty_weight=0.0)
+        '''
+        beam_search_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
+            cell=beam_attn_wrapper,
+            embedding=decoder_embeddings,
+            start_tokens=start_tokens,
+            end_token=end_id,
+            initial_state=beam_attn_wrapper.zero_state(batch_size * beam_width, tf.float32).clone(cell_state=tiled_joined_encoder_state),
+            beam_width=beam_width.eval(),
+            output_layer=fc_layer,
+            length_penalty_weight=0.0)
+        '''
 
         # Distribution sampling
-        elif args.decoder == 'sample':
-            sampling_temperature = args.sampling_temperature
-            assert(sampling_temperature > 0.0)
-            helper = tf.contrib.seq2seq.SampleEmbeddingHelper(decoder_embeddings, start_tokens, end_id, softmax_temperature=sampling_temperature)
-            decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, decoder_initial_state, output_layer=fc_layer)
+        sample_helper = tf.contrib.seq2seq.SampleEmbeddingHelper(decoder_embeddings, start_tokens, end_id, softmax_temperature=sampling_temperature.eval())
+        sample_decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, sample_helper, decoder_initial_state, output_layer=fc_layer)
 
         # Greedy argmax decoder
-        elif args.decoder == 'greedy':
-            helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(decoder_embeddings, start_tokens, end_id)
-            # applied per timestep
-            decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, helper, decoder_initial_state, output_layer=fc_layer)
+        greedy_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(decoder_embeddings, start_tokens, end_id)
+        # applied per timestep
+        greedy_decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, greedy_helper, decoder_initial_state, output_layer=fc_layer)
 
         # Decode!
-        outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(
-            decoder,
+        greedy_outputs, greedy_final_state, greedy_fsl = tf.contrib.seq2seq.dynamic_decode(
+            greedy_decoder,
             #maximum_iterations=maximum_iterations,
             swap_memory=True)
+        greedy_logits = greedy_outputs.rnn_output
+        greedy_predictions = tf.identity(greedy_outputs.sample_id, name="greedy_predictions")
 
-        if args.decoder == 'beam':
-            logits = tf.no_op()
-            predictions = tf.identity(outputs.predicted_ids, name="predictions")
-        else:
-            logits = outputs.rnn_output
-            predictions = tf.identity(outputs.sample_id, name="predictions")
+        sample_outputs, sample_final_state, sample_fsl = tf.contrib.seq2seq.dynamic_decode(
+            sample_decoder,
+            swap_memory=True)
+        sample_logits = sample_outputs.rnn_output
+        sample_predictions = tf.identity(sample_outputs.sample_id, name="sample_predictions")
+
+        '''
+        beam_search_outputs, beam_search_final_state, beam_search_fsl = tf.contrib.seq2seq.dynamic_decode(
+            beam_search_decoder,
+            swap_memory=True)
+        beam_search_logits = tf.no_op()
+        beam_search_predictions = tf.identity(beam_search_outputs.predicted_ids, name="beam_search_predictions")
+        print(beam_search_predictions)
+        '''
+
+        predictions, final_sequence_lengths, logits = tf.case(
+            pred_fn_pairs={
+                tf.equal(decoder_technique, tf.constant(0)): lambda: (greedy_predictions, greedy_fsl, greedy_logits),
+                tf.equal(decoder_technique, tf.constant(1)): lambda: (sample_predictions, sample_fsl, sample_logits),
+                #tf.equal(decoder_technique, tf.constant(2)): lambda: (beam_search_predictions, beam_search_fsl)
+            },
+            exclusive=True)
+
+        predictions = tf.identity(predictions, name='predictions')
+        final_sequence_lengths = tf.identity(final_sequence_lengths, name='final_sequence_lengths')
+        logits = tf.identity(logits, name='logits')
 
     return {
         'lr': lr,
         'keep_prob': keep_prob,
+        'decoder_technique': decoder_technique,
+        'sampling_temperature': sampling_temperature,
+        #'beam_width': beam_width,
         'seq_source_ids': seq_source_ids,
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,
         'seq_reference_lengths': seq_reference_lengths,
 
-        'final_state': final_state,
+        #'final_state': final_state,
         'final_sequence_lengths': final_sequence_lengths,
 
         'embedding_source': encoder_embedding,
         'encoder_states': encoder_states,
 
         'loss': loss,
-        'logits': logits,
         'predictions': predictions,
         'labels': labels,
         'summaries': summaries,
