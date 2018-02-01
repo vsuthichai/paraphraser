@@ -139,7 +139,7 @@ def infer(sess, args, model, id_to_vocab, end_id):
                 sent_pred = sent_pred[0:-1]
             print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
             
-def minimal_graph(sess, args):
+def minimal_graph(sess, args, model):
     #from tensorflow.python.framework.graph_util import convert_variables_to_constants
     from tensorflow.python.tools import freeze_graph 
     from tensorflow.python.tools import optimize_for_inference_lib
@@ -152,26 +152,32 @@ def minimal_graph(sess, args):
     #saver = tf.train.Saver(tf.trainable_variables())
     #saver.save(sess, '/tmp/model')
 
-    tf.train.write_graph(sess.graph_def, '/tmp', 'model.pbtxt')
+    tf.train.write_graph(sess.graph_def, '/media/sdb/models/paraphraser', 'model.pb', as_text=False)
 
     freeze_graph.freeze_graph(
-        input_graph='/tmp/model.pbtxt', 
+        #input_graph='/tmp/model.pbtxt', 
+        input_graph='/media/sdb/models/paraphraser/model.pb',
         input_saver='',
-        input_binary=False, 
+        input_binary=True, 
         input_checkpoint=args.checkpoint,
         output_node_names='predictions',
         restore_op_name='save/restore_all', 
         filename_tensor_name='save/Const:0',
-        output_graph='/tmp/frozen_model.pb', 
+        output_graph='/media/sdb/models/paraphraser/frozen_model.pb', 
         clear_devices=True, 
-        initializer_nodes="")
+        initializer_nodes='')
 
+    '''
     input_graph_def = tf.GraphDef()
+    #with tf.gfile.Open('/media/sdb/models/paraphraser/frozen_model.pb', 'rb') as f:
     with tf.gfile.Open('/tmp/frozen_model.pb', 'rb') as f:
         data = f.read()
         input_graph_def.ParseFromString(data)
+        with tf.Graph().as_default() as graph:
+            tf.import_graph_def(input_graph_def)
+            print(dir(graph))
+            print(graph.find_tensor_by_name('placeholders/sampling_temperature'))
 
-    '''
     output_graph_def = optimize_for_inference_lib.optimize_for_inference(
         input_graph_def,
         ['placeholders/source_ids', 'placeholders/sequence_source_lengths'],
@@ -268,7 +274,7 @@ def main():
 
         # Save minimal graph
         if args.minimize_graph:
-            minimal_graph(sess, args)
+            minimal_graph(sess, args, model)
             return
 
         # Load dataset only in train, dev, or test mode
@@ -301,6 +307,7 @@ def main():
         chencherry = SmoothingFunction()
         global_step = 0
         tf.global_variables_initializer().run()
+        sess.run(model['dummy'], {model['sampling_temperature']: 7.5})
 
         for epoch in xrange(args.epochs):
             train_losses = []
@@ -357,8 +364,7 @@ def main():
 
                 # Print predictions for this batch every 1000 steps
                 # Evaluate on dev set
-                if global_step % 1000 == 0:
-                #if global_step % 300 == 0:
+                if global_step % 1000 == 0 and global_step != 0:
                     debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
                     print("PREDICTIONS!")
                     # print("logits shape: " + str(logits.shape))
@@ -374,8 +380,8 @@ def main():
                     dev_writer.flush()
 
                 # Checkpoint.
-                if global_step % 5000 == 0 and global_step != 0:
-                #if global_step % 100 == 0 and global_step != 0:
+                #if global_step % 5000 == 0 and global_step != 0:
+                if global_step % 100 == 0 and global_step != 0:
                     saver.save(sess, os.path.join(train_logdir, 'model'), global_step=global_step)
 
                 global_step += 1

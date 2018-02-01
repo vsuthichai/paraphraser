@@ -19,11 +19,12 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         lr = tf.placeholder(tf.float32, shape=(), name="learning_rate")
         seq_source_ids = tf.placeholder(tf.int32, shape=(None, None), name="source_ids")
         seq_source_lengths = tf.placeholder(tf.int32, [None], name="sequence_source_lengths")
-        keep_prob = tf.placeholder_with_default(1.0, shape=())
+        keep_prob = tf.placeholder_with_default(1.0, shape=(), name="keep_prob")
         # 0: greedy, 1: sampling, 2: beam
-        decoder_technique = tf.placeholder_with_default(1, shape=(), name="decoder_technique")
         sampling_temperature = tf.placeholder_with_default(0.5, shape=(), name="sampling_temperature")
+        decoder_technique = tf.placeholder_with_default(1, shape=(), name="decoder_technique")
         #beam_width = tf.placeholder_with_default(5, shape=(), name="beam_width")
+        dummy = tf.add(sampling_temperature, 1, name="dummy")
 
         if args.mode in set(['train', 'dev', 'test']):
             seq_reference_ids = tf.placeholder(tf.int32, shape=(None, None), name="reference_ids")
@@ -152,6 +153,14 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         beam_search_predictions = tf.identity(beam_search_outputs.predicted_ids, name="beam_search_predictions")
         print(beam_search_predictions)
         '''
+        z,y,a = tf.case(
+            pred_fn_pairs={
+                tf.equal(sampling_temperature, tf.constant(0.0)): lambda: (greedy_predictions, greedy_fsl, greedy_logits),
+                tf.equal(sampling_temperature, tf.constant(1.0)): lambda: (sample_predictions, sample_fsl, sample_logits),
+            },
+            default = lambda: (sample_predictions, sample_fsl, sample_logits),
+            exclusive=True
+        )
 
         predictions, final_sequence_lengths, logits = tf.case(
             pred_fn_pairs={
@@ -186,6 +195,7 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         'predictions': predictions,
         'labels': labels,
         'summaries': summaries,
-        'train_step': train_step
+        'train_step': train_step,
+        'dummy': dummy
     }
 
