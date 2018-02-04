@@ -200,7 +200,6 @@ def parse_arguments():
     parser.add_argument('--hidden_size', type=int, default=300, help="Hidden dimension size")
     parser.add_argument('--keep_prob', type=float, default=0.8, help="Keep probability for dropout")
     parser.add_argument('--decoder', type=str, choices=['greedy', 'sample'], help="Decoder type")
-    #parser.add_argument('--beam_width', type=int, default=5, help="Beam width")
     parser.add_argument('--sampling_temperature', type=float, default=0.0, help="Sampling temperature")
     parser.add_argument('--mode', type=str, default=None, choices=['train', 'dev', 'test', 'infer'], help='train or dev or test or infer or minimize')
     parser.add_argument('--checkpoint', type=str, default=None, help="Model checkpoint file")
@@ -259,7 +258,7 @@ def main():
 
     with tf.Session() as sess:
         start = dt.datetime.now()
-        model = lstm_model(args, embeddings, start_id, end_id, mask_id, args.mode)
+        model = lstm_model(sess, args.mode, args.hidden_size, embeddings, start_id, end_id, mask_id)
 
         # Saver object
         saver = tf.train.Saver()
@@ -312,8 +311,6 @@ def main():
         for epoch in xrange(args.epochs):
             train_losses = []
             train_batch_generator = dataset_generator.generate_batch('train')
-            #d = next(generator)
-            #while 1:
             for train_batch in train_batch_generator:
                 seq_source_ids = train_batch['seq_source_ids']
                 seq_source_words = train_batch['seq_source_words']
@@ -321,8 +318,6 @@ def main():
                 seq_ref_ids = train_batch['seq_ref_ids']
                 seq_ref_words = train_batch['seq_ref_words']
                 seq_ref_len = train_batch['seq_ref_len']
-
-                #debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
 
                 feed_dict = {
                     model['lr']: lr,
@@ -367,10 +362,8 @@ def main():
                 if global_step % 1000 == 0 and global_step != 0:
                     debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
                     print("PREDICTIONS!")
-                    # print("logits shape: " + str(logits.shape))
                     print("final_seq_lengths: " + str(fsl))
                     print("len(predictions): " + str(len(predictions)))
-                    #print("predictions: " + str(predictions))
                     for prediction in predictions:
                         print(str(len(prediction)) + ' ' + ' '.join([id_to_vocab[vocab_id] for vocab_id in prediction if vocab_id in id_to_vocab]))
 
@@ -381,7 +374,7 @@ def main():
 
                 # Checkpoint.
                 #if global_step % 5000 == 0 and global_step != 0:
-                if global_step % 100 == 0 and global_step != 0:
+                if global_step % 50 == 0 and global_step != 0:
                     saver.save(sess, os.path.join(train_logdir, 'model'), global_step=global_step)
 
                 global_step += 1

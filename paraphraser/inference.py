@@ -1,94 +1,123 @@
 import tensorflow as tf
 from load_sent_embeddings import load_sentence_embeddings
 from preprocess_data import preprocess_batch
+from six.moves import input
+from lstm_model import lstm_model
+import numpy as np
+from pprint import pprint as pp
 
-word_to_id, idx_to_word, embedding, start_id, end_id, unk_id  = load_sentence_embeddings()
 
-with open('/media/sdb/models/paraphraser/frozen_model.pb', 'rb') as f:
-    graph_def = tf.GraphDef()
-    graph_def.ParseFromString(f.read())
+class Paraphraser(object):
+    def __init__(self, checkpoint):
+        self.word_to_id, self.idx_to_word, self.embedding, self.start_id, self.end_id, self.unk_id  = load_sentence_embeddings()
+        self.mask_id = 5800
+        self.checkpoint = checkpoint
+        self.sess = tf.Session()
+        self.model = lstm_model(self.sess, 'infer', 300, self.embedding, self.start_id, self.end_id, self.mask_id)
+        saver = tf.train.Saver()
+        saver.restore(self.sess, checkpoint)
 
-with tf.Graph().as_default() as graph:
-    predictions = tf.import_graph_def(
-        graph_def=graph_def,
-        return_elements=['predictions:0'],
-        name='')
+    def sample_paraphrase(self, sentence, sampling_temp=1.0, how_many=1):
+        """Paraphrase by sampling a distribution
 
-    print([op.name for op in graph.get_operations()])
+        Args:
+            sentence (str): A sentence input that will be paraphrased by 
+                sampling from distribution.
+            sampling_temp (int) : A number between 0 an 1
 
-    seq_source_ids = graph.get_tensor_by_name('placeholders/source_ids:0')
-    seq_source_lengths = graph.get_tensor_by_name('placeholders/sequence_source_lengths:0')
-    decoder_technique = graph.get_tensor_by_name('placeholders/decoder_technique:0')
-    sampling_temperature = graph.get_tensor_by_name('placeholders/sampling_temperature:0')
-    keep_prob = graph.get_tensor_by_name('placeholders/keep_prob:0')
+        Returns:
+            str: a candidate paraphrase of the `sentence`
+        """
 
-model = {
-    'seq_source_ids': seq_source_ids,
-    'seq_source_lengths': seq_source_lengths,
-    'predictions': predictions,
-    'decoder_technique': decoder_technique,
-    'sampling_tempearture': sampling_temperature
-}
+        return self.infer(1, sentence, self.idx_to_word, sampling_temp, how_many)
 
-def translate(predictions, decoder, id_to_vocab, end_id):
-    if decoder == 2:
-        _, sentence_length, num_samples = predictions.shape
-        for i in xrange(num_samples):
-            sent_pred = []
-            for j in xrange(sentence_length):
-                sent_pred.append(predictions[0][j][i])
-            try:
-                end_index = sent_pred.index(end_id)
-                sent_pred = sent_pred[:end_index]
-            except Exception as e:
-                pass
-            #print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
-            return ' '.join([ id_to_vocab[pred] for pred in sent_pred ])
-    else:
+    def greedy_paraphrase(self, sentence):
+        """Paraphrase using greedy sampler
+    
+        Args:
+            sentence : The source sentence to be paraphrased.
+
+        Returns:
+            str : a candidate paraphrase of the `sentence`
+        """
+
+        return self.infer(0, sentence, self.idx_to_word, 0., 1)
+
+
+    def infer(self, decoder, source_sent, id_to_vocab, temp, how_many):
+        """ Perform inferencing.  In other words, generate a paraphrase
+        for the source sentence.
+
+        Args:
+            decoder : 0 for greedy, 1 for sampling
+            source_sent : source sentence to generate a paraphrase for
+            id_to_vocab : dict of vocabulary index to word
+            end_id : the end token
+            temp : the sampling temperature to use when `decoder` is 1
+
+        Returns:
+            str : for the generated paraphrase
+        """
+
+        seq_source_words, seq_source_ids = preprocess_batch([ source_sent ] * how_many)
+        #print(seq_source_words)
+        #print(seq_source_ids)
+        seq_source_len = [ len(seq_source) for seq_source in seq_source_ids ]
+        #print(seq_source_len)
+
+        feed_dict = {
+            self.model['seq_source_ids']: seq_source_ids,
+            self.model['seq_source_lengths']: seq_source_len,
+            self.model['decoder_technique']: decoder,
+            self.model['sampling_temperature']: temp
+        }
+
+        feeds = [
+            self.model['predictions']
+            #model['final_sequence_lengths']
+        ]
+
+        predictions = self.sess.run(feeds, feed_dict)[0]
+        #print(predictions)
+        return self.translate(predictions, decoder, id_to_vocab)
+
+    def translate(self, predictions, decoder, id_to_vocab):
+        """ Translate the vocabulary ids in `predictions` to actual words
+        that compose the paraphrase.
+
+        Args:
+            predictions : arrays of vocabulary ids
+            decoder : 0 for greedy, 1 for sample, 2 for beam
+            id_to_vocab : dict of vocabulary index to word
+
+        Returns:
+            str : the paraphrase
+        """
+        translated_predictions = []
+        #np_end = np.where(translated_predictions == end_id)
         for sent_pred in predictions:
-            if sent_pred[-1] == end_id:
-                sent_pred = sent_pred[0:-1]
-            #print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
-            return ' '.join([ id_to_vocab[pred] for pred in sent_pred ])
-
-
-def infer(sess, model, decoder, source_sent, id_to_vocab, end_id, temp):
-    from preprocess_data import preprocess_batch
-
-    seq_source_words, seq_source_ids = preprocess_batch([ source_sent ])
-    seq_source_len = [ len(seq_source) for seq_source in seq_source_ids ]
-
-    feed_dict = {
-        model['seq_source_ids']: seq_source_ids,
-        model['seq_source_lengths']: seq_source_len,
-        model['decoder_technique']: decoder,
-        model['sampling_temperature']: temp
-    }
-
-    feeds = [
-        model['predictions']
-        #model['final_sequence_lengths']
-    ]
-
-    # predictions, final_sequence_lengths = sess.run(feeds, feed_dict)
-    predictions = sess.run(feeds, feed_dict)[0][0]
-    #print(predictions)
-    #print(predictions.shape)
-    return translate(predictions, decoder, id_to_vocab, end_id)
-
-def greedy_paraphrase(sentence):
-    with tf.Session(graph=graph) as sess:
-        return infer(sess, model, 0, sentence, idx_to_word, end_id, 0.)
-
-def sampler_paraphrase(sentence, temp=0.5):
-    with tf.Session(graph=graph) as sess:
-        return infer(sess, model, 1, sentence, idx_to_word, end_id, temp)
+            translated = []
+            for pred in sent_pred:
+                if pred == self.end_id:
+                    break
+                word = id_to_vocab[pred]
+                translated.append(word)
+            translated_predictions.append(' '.join(translated))
+        return translated_predictions
 
 def main():
-    a = sampler_paraphrase('hello world.')
-    print(a)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--checkpoint', type=str, help='Checkpoint path')
+    args = parser.parse_args()
+    paraphraser = Paraphraser(args.checkpoint)
+
+    while 1:
+        source_sentence = input("Source: ")
+        paraphrases = paraphraser.sample_paraphrase(source_sentence, sampling_temp=1.0, how_many=5)
+        for i, paraphrase in enumerate(paraphrases):
+            print("Paraph #{}: {}".format(i, paraphrase))
 
 if __name__ == '__main__':
     main()
-
 

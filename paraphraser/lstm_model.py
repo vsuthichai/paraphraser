@@ -3,9 +3,10 @@ import datetime as dt
 import sys
 import numpy as np
 from tensorflow.python.layers import core as layers_core
+from sample_embedding_helper import MySampleEmbeddingHelper
 
-
-def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
+#def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
+def lstm_model(sess, mode, cell_hidden_size, np_embeddings, start_id, end_id, mask_id):
     vocab_size, hidden_size = np_embeddings.shape
 
     # Embeddings
@@ -26,7 +27,7 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         #beam_width = tf.placeholder_with_default(5, shape=(), name="beam_width")
         dummy = tf.add(sampling_temperature, 1, name="dummy")
 
-        if args.mode in set(['train', 'dev', 'test']):
+        if mode in set(['train', 'dev', 'test']):
             seq_reference_ids = tf.placeholder(tf.int32, shape=(None, None), name="reference_ids")
             seq_reference_lengths = tf.placeholder(tf.int32, [None], name="sequence_reference_lengths")
             paddings = tf.constant([[0, 0], [0, 1]])
@@ -42,8 +43,8 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
     # Encoder
     #with tf.variable_scope('encoder'):
     encoder_embedding = tf.nn.embedding_lookup(encoder_embeddings, seq_source_ids, name="encoder_embedding")
-    encoder_fw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
-    encoder_bw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+    encoder_fw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(cell_hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+    encoder_bw_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(cell_hidden_size), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
     encoder_outputs, encoder_states = tf.nn.bidirectional_dynamic_rnn(cell_fw=encoder_fw_cell, 
                                                                       cell_bw=encoder_bw_cell,
                                                                       inputs=encoder_embedding, 
@@ -56,9 +57,9 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
     joined_encoder_state = tf.contrib.rnn.LSTMStateTuple(encoder_state_c, encoder_state_h)
 
     fc_layer = layers_core.Dense(vocab_size, use_bias=False)
-    attention = tf.contrib.seq2seq.BahdanauAttention(num_units=args.hidden_size, memory=concat_encoder_outputs)
-    decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
-    attn_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention, attention_layer_size=args.hidden_size)
+    attention = tf.contrib.seq2seq.BahdanauAttention(num_units=cell_hidden_size, memory=concat_encoder_outputs)
+    decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(cell_hidden_size * 2), input_keep_prob=keep_prob, output_keep_prob=keep_prob)
+    attn_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attention, attention_layer_size=cell_hidden_size)
     zero_state = attn_cell.zero_state(batch_size, tf.float32)
     decoder_initial_state = zero_state.clone(cell_state=joined_encoder_state)
 
@@ -66,13 +67,13 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
     tiled_joined_encoder_state = tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width)
     tiled_concat_encoder_outputs = tf.contrib.seq2seq.tile_batch(concat_encoder_outputs, multiplier=beam_width)
     beam_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-        num_units=args.hidden_size,
+        num_units=hidden_size,
         memory=tiled_concat_encoder_outputs)
-    #decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2), input_keep_prob=1.0, output_keep_prob=1.0)
+    #decoder_cell = tf.contrib.rnn.DropoutWrapper(tf.nn.rnn_cell.BasicLSTMCell(hidden_size * 2), input_keep_prob=1.0, output_keep_prob=1.0)
     beam_attn_wrapper = tf.contrib.seq2seq.AttentionWrapper(
-        cell=tf.nn.rnn_cell.BasicLSTMCell(args.hidden_size * 2),
+        cell=tf.nn.rnn_cell.BasicLSTMCell(hidden_size * 2),
         attention_mechanism=beam_attention_mechanism, 
-        attention_layer_size=args.hidden_size)
+        attention_layer_size=hidden_size)
     '''
 
     # Train, dev, test
@@ -123,7 +124,8 @@ def lstm_model(args, np_embeddings, start_id, end_id, mask_id, mode):
         '''
 
         # Distribution sampling
-        sample_helper = tf.contrib.seq2seq.SampleEmbeddingHelper(decoder_embeddings, start_tokens, end_id, softmax_temperature=sampling_temperature.eval())
+        #sample_helper = MySampleEmbeddingHelper(decoder_embeddings, start_tokens, end_id, softmax_temperature=sampling_temperature)
+        sample_helper = tf.contrib.seq2seq.SampleEmbeddingHelper(decoder_embeddings, start_tokens, end_id, softmax_temperature=sampling_temperature)
         sample_decoder = tf.contrib.seq2seq.BasicDecoder(attn_cell, sample_helper, decoder_initial_state, output_layer=fc_layer)
 
         # Greedy argmax decoder
