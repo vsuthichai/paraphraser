@@ -13,6 +13,7 @@ pip install git+git://github.com/vsuthichai/paraphraser.git
 ```
 
 ## Usage
+
 ```python
 from paraphraser import paraphrase
 print(paraphrase("hello world"))
@@ -24,7 +25,7 @@ This project was developed for Praxis SW under the Insight Data Science Artifici
 
 ## Model
 
-The underlying model used is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.
+The underlying model is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.
 
 ### Datasets
 
@@ -35,7 +36,7 @@ The dataset used to train this model is an aggregation of many different public 
 * Semeval
 * And more!
 
-I have not included the dataset as part of this repo.  If you're curious and would like to know more, contact me.  Pretrained embeddings come from John Wieting's [para-nmt-50m](https://github.com/jwieting/para-nmt-50m) project.
+I have not included the aggregated dataset as part of this repo.  If you're curious and would like to know more, contact me.  Pretrained embeddings come from [John Wieting](http://www.cs.cmu.edu/~jwieting)'s [para-nmt-50m](https://github.com/jwieting/para-nmt-50m) project.
 
 ### Training
 
@@ -43,13 +44,14 @@ Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU sco
 
 <img src="https://raw.githubusercontent.com/vsuthichai/paraphraser/master/images/20180128-035256-plot.png" align="center">
 
-## TODOs and Future Work
+## TODOs
 
 * Explore deeper number of layers
 * Recurrent layer dropout
 * Greater dataset augmentation 
 
-### Citations
+## Citations
+
 ```
 @inproceedings { wieting-17-millions, 
     author = {John Wieting and Kevin Gimpel}, 
