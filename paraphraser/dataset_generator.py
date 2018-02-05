@@ -29,9 +29,6 @@ class ParaphraseDataset(object):
                 if k == 'maxlen':
                     self.dataset_metadata[v] = dm
         self.dataset = {}
-        #self.load_dataset_into_memory('train')
-        #self.load_dataset_into_memory('dev')
-        #self.load_dataset_into_memory('test')
 
     def load_dataset_into_memory(self, dataset_type):
         if dataset_type not in set(['train', 'test', 'dev']):
@@ -137,67 +134,6 @@ class ParaphraseDataset(object):
         padded_batch = np.array(pad_sequences(batch_ids, maxlen=max_len, padding='post', value=self.mask_id))
         return padded_batch
 
-    '''
-    def generate_batch(self, dataset_type, length=None):
-        if dataset_type not in set(['train', 'test', 'dev']):
-            raise ValueError("Invalid dataset type.")
-
-        if length == None:
-            lengths = self.lengths
-        else:
-            lengths = [ length ]
-
-        for length in lengths:
-            with open(self.dataset_metadata[length][dataset_type], 'r') as f:
-                batch_source_words = []
-                batch_source_ids = []
-                batch_source_len = []
-                batch_ref_words = []
-                batch_ref_ids = []
-                batch_ref_len = []
-
-                for line in f:
-                    source_words, source_ids, ref_words, ref_ids = line.split('\t')
-                    batch_source_words.append(source_words.strip().split(' '))
-                    batch_source_ids.append(source_ids.strip().split(' '))
-                    batch_ref_words.append(ref_words.strip().split(' '))
-                    batch_ref_ids.append(ref_ids.strip().split(' '))
-
-                    if len(batch_source_words) != batch_size:
-                        continue
-
-                    batch_source_len = [ len(source_ids) for source_ids in batch_source_ids ]
-                    batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
-
-                    yield {
-                        'seq_source_ids': self.pad_batch(batch_source_ids, length),
-                        'seq_source_words': batch_source_words,
-                        'seq_source_len': batch_source_len,
-                        'seq_ref_ids': self.pad_batch(batch_ref_ids, length),
-                        'seq_ref_words': batch_ref_words,
-                        'seq_ref_len': batch_ref_len,
-                    }
-
-                    batch_source_words = []
-                    batch_source_ids = []
-                    batch_source_len = []
-                    batch_ref_words = []
-                    batch_ref_ids = []
-                    batch_ref_len = []
-
-                if len(batch_source_words) > 0:
-                    batch_source_len = [ len(source_ids) for source_ids in batch_source_ids ]
-                    batch_ref_len = [ len(ref_ids) for ref_ids in batch_ref_ids ] 
-
-                    yield {
-                        'seq_source_ids': self.pad_batch(batch_source_ids, length),
-                        'seq_source_words': batch_source_words,
-                        'seq_source_len': batch_source_len,
-                        'seq_ref_ids': self.pad_batch(batch_ref_ids, length),
-                        'seq_ref_words': batch_ref_words,
-                        'seq_ref_len': batch_ref_len
-                    }
-    '''
 
 if __name__ == '__main__':
     from pprint import pprint as pp
