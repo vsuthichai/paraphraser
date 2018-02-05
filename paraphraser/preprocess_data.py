@@ -1,3 +1,23 @@
+"""Dataset preprocessing and generation.
+
+This module's purpose is to consume raw paraphrase text and output a dataset
+in an optimal form to later be consumed by ParaphraseDataset class in
+dataset_generator.py.  The raw text are assumed to be valid paraphrases
+and must follow the following format each line:
+
+source sentence\treference sentence
+
+The number of tokens within a sentence are counted so that samples can be 
+grouped into the same file by similar length.  After nlp preprocessing and
+tokenization, the resulting new format per line is:
+
+source sentence tokens\tsource sentence token ids\treference tokens\treference token ids
+
+This format is consumed directly into ParaphraseDataset to generate mini
+batches where each batch contains similar length sentences.
+
+"""
+
 import os
 from six import iteritems
 from nlp_pipeline import openmp_nlp_pipeline
