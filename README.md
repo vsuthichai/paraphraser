@@ -27,9 +27,11 @@ Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU sco
 
 ## TODOs
 
+* pip installable package
 * Explore deeper number of layers
 * Recurrent layer dropout
 * Greater dataset augmentation 
+* Try residual layer
 
 ## Citations
 
