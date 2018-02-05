@@ -8,7 +8,18 @@ from pprint import pprint as pp
 
 
 class Paraphraser(object):
+    '''Heart of the paraphraser model.  This class loads the checkpoint
+    into the Tensorflow runtime environment and is responsible for inference.
+    Greedy and sampling based approaches are supported
+    '''
+
     def __init__(self, checkpoint):
+        """Constructor.  Load vocabulary index, start token, end token, unk id,
+        mask_id.  Restore checkpoint.
+
+        Args:
+            checkpoint: A path to the checkpoint
+        """
         self.word_to_id, self.idx_to_word, self.embedding, self.start_id, self.end_id, self.unk_id  = load_sentence_embeddings()
         self.mask_id = 5800
         self.checkpoint = checkpoint
