@@ -6,7 +6,37 @@ from six import iteritems
 from random import shuffle
 
 class ParaphraseDataset(object):
+    """This class is responsible for batching the paraphrase dataset into mini batches
+    for train, dev, and test.  The dataset itself must be partition into files
+    beforehand and must follow this format:
+    
+    "source sentence\tsource sentence token ids\treference sentence\treference sentence token ids"
+    
+    The intraseparator is a space.  
+    """
+
     def __init__(self, dataset_metadata, batch_size, embeddings, word_to_id, start_id, end_id, unk_id, mask_id):
+        """ Constructor initialization.
+
+        Args:
+            dataset_metadata: metadata list that follows the format [
+                    {
+                        'maxlen': X
+                        'train': training filename with sentences of length X,
+                        'dev': dev filename with sentences of length X,
+                        'test': test filename with sentences of length X,
+                    },
+                ].  Each element is a list that describes the train, dev, and
+                test files for sentences of maximum length X.
+            batch_size: mini batch size
+            embeddings: pretrained embeddings
+            word_to_id: vocabulary index
+            start_id: start of sentence token id
+            end_id: end of sentence token id
+            unk_id: unknown token id
+            mask_id: pad token id applied after the end of sentence.
+        """
+                
         # batch size
         self.batch_size = batch_size
 
@@ -31,6 +61,8 @@ class ParaphraseDataset(object):
         self.dataset = {}
 
     def load_dataset_into_memory(self, dataset_type):
+        """Load dataset into memory and partition by train, dev, and test."""
+
         if dataset_type not in set(['train', 'test', 'dev']):
             raise ValueError("Invalid dataset type.")
 
@@ -97,6 +129,12 @@ class ParaphraseDataset(object):
                     batch_ref_len = []
 
     def generate_batch(self, dataset_type):
+        """Return a generator that yields a mini batch of size self.batch_size.
+        
+        Args:
+            dataset_type: 'train', 'test', or 'dev'
+        """
+
         if dataset_type not in set(['train', 'test', 'dev']):
             raise ValueError("Invalid dataset type.")
 
@@ -104,7 +142,6 @@ class ParaphraseDataset(object):
             self.load_dataset_into_memory(dataset_type)
 
         dataset_size = len(self.dataset[dataset_type]['all_source_ids'])
-        print(dataset_size)
 
         rs = np.random.get_state()
         np.random.shuffle(self.dataset[dataset_type]['all_source_ids'])
@@ -131,50 +168,24 @@ class ParaphraseDataset(object):
             }
 
     def pad_batch(self, batch_ids, max_len):
+        """ Pad a mini batch with mask_id.  This is intended to fill in any
+        remaining time steps after the end of sentence tokens.
+
+        Args:
+            batch_ids: The mini batch of token ids of shape (batch_size, time_steps)
+            max_len: The maximum number of time steps.
+
+        Returns:
+            a batch of samples padded with mask_id
+        """
         padded_batch = np.array(pad_sequences(batch_ids, maxlen=max_len, padding='post', value=self.mask_id))
         return padded_batch
 
 
 if __name__ == '__main__':
     from pprint import pprint as pp
-    dataset = [
-        { 
-            'maxlen': 5,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.5',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.5',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.5' 
-        },
-        { 
-            'maxlen': 10,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.10',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.10',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.10' 
-        },
-        { 
-            'maxlen': 20,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.20',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.20',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.20' 
-        },
-        { 
-            'maxlen': 30,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.30',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.30',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.30' 
-        },
-        { 
-            'maxlen': 40,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.40',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.40',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.40' 
-        },
-        { 
-            'maxlen': 50,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.50',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.50',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.50' 
-        }
-    ]
+    from utils import dataset_config
+    dataset = dataset_config()
     word_to_id, idx_to_word, embeddings, start_id, end_id, unk_id = load_sentence_embeddings()
     pd = ParaphraseDataset(dataset, 10, embeddings, word_to_id, start_id, end_id, unk_id, mask_id=5800)
     generator = pd.generate_batch('train')
