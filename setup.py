@@ -49,7 +49,8 @@ setup(
 
     py_modules=['paraphraser.synonym_model', 'paraphraser.inference', 'paraphraser.download_models'],
     #packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    install_requires=['nltk', 'spacy', 'ipython'],
+    #install_requires=['nltk', 'spacy', 'ipython'],
+    install_requires=[],
     extras_require={
 
     },
@@ -60,8 +61,8 @@ setup(
     entry_points={
     },
     cmdclass={
-        'download_model': DownloadParaphraseModel,
-        'download_corpora': DownloadCorpora
+        'download_model': DownloadParaphraseModel
+        #'download_corpora': DownloadCorpora
     }
 )
 
