@@ -60,8 +60,8 @@ setup(
     entry_points={
     },
     cmdclass={
-        'download_corpora': DownloadCorpora,
-        'download_model': DownloadParaphraseModel
+        'download_model': DownloadParaphraseModel,
+        'download_corpora': DownloadCorpora
     }
 )
 
