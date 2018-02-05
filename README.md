@@ -41,6 +41,6 @@ I have not included the dataset as part of this repo.  If you're curious and wou
 
 Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU score. The Tensorboard training curves can be seen below
 
-<img src="https://raw.githubusercontent.com/vsuthichai/paraphraser/master/images/20180128-035256-plot.png" align="center" height="1368" width="574" >
+<img src="https://raw.githubusercontent.com/vsuthichai/paraphraser/master/images/20180128-035256-plot.png" align="center" height="574" width="1368" >
 
 
