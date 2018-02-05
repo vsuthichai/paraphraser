@@ -120,20 +120,6 @@ def infer(sess, args, model, id_to_vocab, end_id):
         #print(predictions)
         #print(final_sequence_lengths)
 
-        '''
-        if decoder == 'beam':
-            _, sentence_length, num_samples = predictions.shape
-            for i in xrange(num_samples):
-                sent_pred = []
-                for j in xrange(sentence_length):
-                    sent_pred.append(predictions[0][j][i])
-                try:
-                    end_index = sent_pred.index(end_id)
-                    sent_pred = sent_pred[:end_index]
-                except Exception as e:
-                    pass
-                print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
-        '''
         for sent_pred in predictions:
             if sent_pred[-1] == end_id:
                 sent_pred = sent_pred[0:-1]
@@ -190,6 +176,7 @@ def minimal_graph(sess, args, model):
 
         
 def parse_arguments():
+    '''Argument parser configuration.  '''
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--log_dir', type=str, default="logs", help="Log directory to store tensorboard summary and model checkpoints")
