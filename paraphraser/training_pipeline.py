@@ -9,27 +9,26 @@ from lstm_model import lstm_model
 from load_sent_embeddings import load_sentence_embeddings
 from dataset_generator import ParaphraseDataset
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
+from utils import dataset_config, debug_data
+import logging
 
-def debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab):
-    print("==============================================================")
-    print("SOURCE!")
-    #print(seq_source_ids)
-    for source_ids in seq_source_ids:
-        print(' '.join([id_to_vocab[source_id] for source_id in source_ids]))
-    print(seq_source_len)
-    print("REFERENCE!")
-    #print(seq_ref_ids)
-    for i in seq_ref_ids:
-        print(' '.join([id_to_vocab[label] for label in i if label != -1]))
-    print(seq_ref_len)
-    print("==============================================================")
-    return
-
-def summarize_scalar(writer, tag, value, step):
-    summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-    writer.add_summary(summary, step)
+logging.basicConfig(format = u'[%(asctime)s] %(levelname)-8s : %(message)s', level = logging.INFO)
 
 def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
+    """Evaluate current model on the dev or test set.
+    
+    Args:
+        sess: Tensorflow session
+        model: dictionary containing model's tensors of interest for evaluation
+        dataset_generator: dataset batch generator
+        mode: 'dev' or 'test'
+        id_to_vocab: voabulary dictionary id -> word
+
+    Returns:
+        loss: the loss after evaluating the dataset
+        bleu_score: BLEU score after evaluation
+    """
+
     batch_generator = dataset_generator.generate_batch(mode)
     chencherry = SmoothingFunction()
     batch_losses = []
@@ -63,14 +62,6 @@ def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
             debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
             raise e
 
-        #debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
-        #print("PREDICTIONS!")
-        #print("final_seq_lengths: " + str(fsl))
-        #print("len(predictions): " + str(len(predictions)))
-        #print("predictions: " + str(predictions))
-        #for prediction in predictions:
-            #print(str(len(prediction)) + ' ' + ' '.join([id_to_vocab[vocab_id] for vocab_id in prediction if vocab_id in id_to_vocab]), flush=True)
-
         # batch losses
         batch_losses.append(batch_loss)
 
@@ -85,10 +76,22 @@ def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
 
     bleu_score = corpus_bleu(all_seq_ref_words, all_bleu_pred_words, smoothing_function=chencherry.method1)
     loss = sum(batch_losses) / len(batch_losses)
-    print("{} : Evaluating on {} set loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), mode, loss, bleu_score), flush=True)
+    logging.info("{} : Evaluating on {} set loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), mode, loss, bleu_score), flush=True)
     return loss, bleu_score
 
 def infer(sess, args, model, id_to_vocab, end_id):
+    """Perform inference on a model.  This is intended to be interactive.
+    A user will run this from the command line to provide an input sentence
+    and receive a paraphrase as output continuously within a loop.
+
+    Args:
+        sess: Tensorflow session
+        args: ArgumentParser object configuration
+        model: a dictionary containing the model tensors
+        id_to_vocab: vocabulary index of id_to_vocab
+        end_id: the end of sentence token
+
+    """
     from preprocess_data import preprocess_batch
 
     while 1:
@@ -100,15 +103,12 @@ def infer(sess, args, model, id_to_vocab, end_id):
             decoder = 0
         elif args.decoder == 'sample':
             decoder = 1
-        #elif args.decoder == 'beam':
-            #decoder = 2
 
         feed_dict = {
             model['seq_source_ids']: seq_source_ids,
             model['seq_source_lengths']: seq_source_len,
             model['decoder_technique']: decoder,
             model['sampling_temperature']: args.sampling_temperature,
-            #model['beam_width']: args.beam_width
         }
 
         feeds = [
@@ -117,26 +117,27 @@ def infer(sess, args, model, id_to_vocab, end_id):
         ]
 
         predictions, final_sequence_lengths = sess.run(feeds, feed_dict)
-        #print(predictions)
-        #print(final_sequence_lengths)
 
         for sent_pred in predictions:
             if sent_pred[-1] == end_id:
                 sent_pred = sent_pred[0:-1]
             print("Paraphrase : {}".format(' '.join([ id_to_vocab[pred] for pred in sent_pred ])))
             
-def minimal_graph(sess, args, model):
-    #from tensorflow.python.framework.graph_util import convert_variables_to_constants
+def compress_graph(sess, args, model):
+    """After training has completed, this function can be called to compress
+    the model.  The computation graph is frozen turning the checkpoint
+    variables into constants.  Finally, optimization is done by stripping
+    away all unnecessary nodes from the graph if they are not used at
+    inference time.
+
+    Args:
+        sess: Tensorflow session
+        args: ArgumentParser config object
+        model: model dictionary containing tensors of interest
+
+    """
     from tensorflow.python.tools import freeze_graph 
     from tensorflow.python.tools import optimize_for_inference_lib
-
-    #graph_def = sess.graph.as_graph_def()
-    #minimal_graph = convert_variables_to_constants(sess, graph_def, ['output'])
-    #tf.train.write_graph(minimal_graph, '/tmp', 'minimal_graph.proto', as_text=False)
-    #tf.train.write_graph(minimal_graph, '/tmp', 'minimal_graph.txt', as_text=True)
-
-    #saver = tf.train.Saver(tf.trainable_variables())
-    #saver.save(sess, '/tmp/model')
 
     tf.train.write_graph(sess.graph_def, '/media/sdb/models/paraphraser', 'model.pb', as_text=False)
 
@@ -176,7 +177,7 @@ def minimal_graph(sess, args, model):
 
         
 def parse_arguments():
-    '''Argument parser configuration.  '''
+    """Argument parser configuration."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--log_dir', type=str, default="logs", help="Log directory to store tensorboard summary and model checkpoints")
@@ -195,50 +196,14 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
+    """Entry point for all training, evaluation, and model compression begins here"""
     args = parse_arguments()
     word_to_id, id_to_vocab, embeddings, start_id, end_id, unk_id = load_sentence_embeddings()
     mask_id = 5800
     vocab_size, embedding_size = embeddings.shape
     lr = args.lr
 
-    dataset = [
-        { 
-            'maxlen': 5,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.5',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.5',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.5' 
-        },
-        { 
-            'maxlen': 10,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.10',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.10',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.10' 
-        },
-        { 
-            'maxlen': 20,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.20',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.20',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.20' 
-        },
-        { 
-            'maxlen': 30,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.30',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.30',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.30' 
-        },
-        { 
-            'maxlen': 40,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.40',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.40',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.40' 
-        },
-        { 
-            'maxlen': 50,
-            'train': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.train.50',
-            'dev': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.dev.50',
-            'test': '/media/sdb/datasets/aggregate_paraphrase_corpus_0/dataset.test.50' 
-        }
-    ]
+    dataset = dataset_config()
 
     if args.mode not in set(['train', 'dev', 'test', 'infer', 'minimize']):
         raise ValueError("{} is not a valid mode".format(args.mode))
@@ -249,10 +214,7 @@ def main():
 
         # Saver object
         saver = tf.train.Saver()
-
         name_to_var_map = {var.op.name: var for var in tf.global_variables()}
-        from pprint import pprint as pp
-        pp(name_to_var_map)
 
         # Restore checkpoint
         if args.checkpoint:
@@ -260,12 +222,12 @@ def main():
 
         # Save minimal graph
         if args.minimize_graph:
-            minimal_graph(sess, args, model)
+            compress_graph(sess, args, model)
             return
 
         # Load dataset only in train, dev, or test mode
         if args.mode in set(['train', 'dev', 'test']):
-            print("{}: Loading dataset into memory.".format(dt.datetime.now()))
+            logging.info("{}: Loading dataset into memory.".format(dt.datetime.now()))
             dataset_generator = ParaphraseDataset(dataset, args.batch_size, embeddings, word_to_id, start_id, end_id, unk_id, mask_id)
 
         # Evaluate on dev or test
@@ -295,6 +257,7 @@ def main():
         tf.global_variables_initializer().run()
         sess.run(model['dummy'], {model['sampling_temperature']: 7.5})
 
+        # Training per epoch
         for epoch in xrange(args.epochs):
             train_losses = []
             train_batch_generator = dataset_generator.generate_batch('train')
@@ -342,17 +305,18 @@ def main():
                     summarize_scalar(train_writer, 'bleu_score', bleu_score, global_step)
                     train_loss = sum(train_losses) / len(train_losses)
                     summarize_scalar(train_writer, 'loss', train_loss, global_step)
-                    print("{} : step={} epoch={} batch_loss={:.4f} train_loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), global_step, epoch, batch_loss, train_loss, bleu_score), flush=True)
+                    logging.info("{} : step={} epoch={} batch_loss={:.4f} train_loss={:.4f} bleu={:.4f}".format(
+                        dt.datetime.now(), global_step, epoch, batch_loss, train_loss, bleu_score), flush=True)
 
                 # Print predictions for this batch every 1000 steps
                 # Evaluate on dev set
                 if global_step % 1000 == 0 and global_step != 0:
                     debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_vocab)
-                    print("PREDICTIONS!")
-                    print("final_seq_lengths: " + str(fsl))
-                    print("len(predictions): " + str(len(predictions)))
+                    logging.info("PREDICTIONS!")
+                    logging.info("final_seq_lengths: " + str(fsl))
+                    logging.info("len(predictions): " + str(len(predictions)))
                     for prediction in predictions:
-                        print(str(len(prediction)) + ' ' + ' '.join([id_to_vocab[vocab_id] for vocab_id in prediction if vocab_id in id_to_vocab]))
+                        logging.info(str(len(prediction)) + ' ' + ' '.join([id_to_vocab[vocab_id] for vocab_id in prediction if vocab_id in id_to_vocab]))
 
                     dev_loss, bleu_score = evaluate(sess, model, dataset_generator, 'dev', id_to_vocab)
                     summarize_scalar(dev_writer, 'bleu_score', bleu_score, global_step)

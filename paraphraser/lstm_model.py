@@ -63,7 +63,7 @@ def lstm_model(sess, mode, cell_hidden_size, np_embeddings, start_id, end_id, ma
     zero_state = attn_cell.zero_state(batch_size, tf.float32)
     decoder_initial_state = zero_state.clone(cell_state=joined_encoder_state)
 
-    '''
+    ''' Beam search 
     tiled_joined_encoder_state = tf.contrib.seq2seq.tile_batch(joined_encoder_state, multiplier=beam_width)
     tiled_concat_encoder_outputs = tf.contrib.seq2seq.tile_batch(concat_encoder_outputs, multiplier=beam_width)
     beam_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
@@ -186,13 +186,10 @@ def lstm_model(sess, mode, cell_hidden_size, np_embeddings, start_id, end_id, ma
         'seq_source_lengths': seq_source_lengths,
         'seq_reference_ids': seq_reference_ids,
         'seq_reference_lengths': seq_reference_lengths,
-
         #'final_state': final_state,
         'final_sequence_lengths': final_sequence_lengths,
-
         'embedding_source': encoder_embedding,
         'encoder_states': encoder_states,
-
         'loss': loss,
         'predictions': predictions,
         'labels': labels,
