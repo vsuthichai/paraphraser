@@ -2,7 +2,6 @@ from setuptools import setup, find_packages
 from codecs import open
 from os import path
 from setuptools.command.install import install
-from download_models import download_file_from_google_drive
 
 here = path.abspath(path.dirname(__file__))
 
@@ -20,6 +19,7 @@ class DownloadCorpora(install):
 class DownloadParaphraseModel(install):
     def run(self):
         install.run(self)
+        from paraphaser.download_models import download_file_from_google_drive
         download_file_from_google_drive('19QDCd4UMgt3FtlYYwu0qZU3G1F9_XCvk', 
                                         'paraphrase-model.tar.gz')
 
@@ -47,7 +47,7 @@ setup(
         'paraphraser'
     ],
 
-    py_modules=['paraphraser.synonym_model'],
+    py_modules=['paraphraser.synonym_model', 'paraphraser.inference', 'paraphraser.download_models'],
     #packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=['nltk', 'spacy', 'ipython'],
     extras_require={
