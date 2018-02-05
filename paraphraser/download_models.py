@@ -61,6 +61,7 @@ if __name__ == "__main__":
     #NTS_w2v_model_output = 'NTS-w2v_epoch11_10.20.t7'
     #download_file_from_google_drive(NTS_w2v_model, os.path.join(out_dir, NTS_w2v_model_output))
 
-    model = '1_JsQ_iMnHwvnyd5vZM-6BMqe9hnVqrPi'
-    download_file_from_google_drive(model, 'frozen_model.pb')
+    #model = '1_JsQ_iMnHwvnyd5vZM-6BMqe9hnVqrPi'
+    model = '19QDCd4UMgt3FtlYYwu0qZU3G1F9_XCvk'
+    download_file_from_google_drive(model, 'paraphrase-model.tar.gz')
 
