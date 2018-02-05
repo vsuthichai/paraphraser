@@ -5,6 +5,7 @@ from six import iteritems
 from keras.layers.embeddings import Embedding
 
 def load_sentence_embeddings():
+    '''Load John Wieting sentence embeddings'''
     with open("../../para-nmt-50m/data/ngram-word-concat-40.pickle", 'rb') as f:
         # [ numpy.ndarray(95283, 300), numpy.ndarray(74664, 300), (trigram_dict, word_dict)]
         x = pickle.load(f, encoding='latin1')
