@@ -1,6 +1,8 @@
 # Paraphraser 
 
-This project providers users the ability to generate paraphrases for sentences through a clean and simple API.  A demo can be seen here: [Pair-a-phrase](http://pair-a-phrase.it)
+This project providers users the ability to generate paraphrases for sentences through a clean and simple API.  A demo can be seen here: [pair-a-phrase](http://pair-a-phrase.it)
+
+The paraphraser was developed for Praxis SW under the [Insight Data Science Artificial Intelligence](http://insightdata.ai/) program.  Praxis SW goals are to generate paraphrases for applications.  Their immediate goal is to generate data to improve interaction between consumers and their voice activated devices.  Assume a user issued a command to their user by saying `"Book me a flight to Hawaii."`, it should be able to understand all the myriad number of ways that you could convey the same meaning using different words.  For example, `"Schedule a flight to Hawaii"` or `"Purchase a planet ticket to Hawaii"`.  Alexa needs to be able to recognize these different paraphrases in order to recognize your task.
 
 ## Prerequisites
 
@@ -18,10 +20,6 @@ pip install git+git://github.com/vsuthichai/paraphraser.git
 from paraphraser import paraphrase
 print(paraphrase("hello world"))
 ```
-
-## Consulting Project
-
-This project was developed for Praxis SW under the Insight Data Science Artificial Intelligence program.  Praxis SW goals are to generate paraphrases for applications.  Their immediate goal is to generate data to improve interaction between consumers and their voice activated devices.  Assume a user issued a command to their user by saying "Book me a flight to Hawaii.", it should be able to understand all the myriad number of ways that you could convey the same meaning using different words.  For example, "Schedule a flight to Hawaii" or "Purchase a planet ticket to Hawaii".  Alexa needs to be able to recognize these different paraphrases in order to recognize your task.
 
 ## Model
 
@@ -66,3 +64,4 @@ Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU sco
     year = {2017} 
 }
 ```
+

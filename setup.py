@@ -2,6 +2,7 @@ from setuptools import setup, find_packages
 from codecs import open
 from os import path
 from setuptools.command.install import install
+from download_models import download_file_from_google_drive
 
 here = path.abspath(path.dirname(__file__))
 
@@ -16,9 +17,15 @@ class DownloadCorpora(install):
         nltk.download('wordnet')
         spacy.cli.download('download', 'en')
 
+class DownloadParaphraseModel(install):
+    def run(self):
+        install.run(self)
+        download_file_from_google_drive('19QDCd4UMgt3FtlYYwu0qZU3G1F9_XCvk', 
+                                        'paraphrase-model.tar.gz')
+
 setup(
     name='paraphraser',
-    version='0.1.0a1',
+    version='0.1.0',
     description='Generate sentence paraphrases given an input sentence',
     long_description=long_desc,
     url='https://github.com/vsuthichai/paraphraser',
@@ -53,7 +60,8 @@ setup(
     entry_points={
     },
     cmdclass={
-        'install': DownloadCorpora
+        'download_corpora': DownloadCorpora,
+        'download_model': DownloadParaphraseModel
     }
 )
 
