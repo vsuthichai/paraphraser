@@ -8,20 +8,23 @@ nlp = spacy.load('en')
 tokenizer = Tokenizer(nlp.vocab)
 
 def nlp_pipeline(sentence, word_to_id, unk_id):
+    ''' Convert word tokens into their vocab ids '''
     return [ word_to_id.get(token.lower_, unk_id) for token in nlp_pipeline_0(sentence) ]
 
 def nlp_pipeline_0(sentence):
+    ''' Execute spacy pipeline, single thread '''
     return nlp(sentence, disable=['parser', 'tagger', 'ner'])
 
 def mp_nlp_pipeline(pool, lines):
+    ''' Execute spacy pipeline, multiprocessing style '''
     return pool.map(nlp_pipeline_0, lines, 1)
 
 def openmp_nlp_pipeline(lines, n_threads=12):
+    ''' Execute spacy's openmp nlp pipeline '''
     return [ [ token.lower_ for token in doc ] for doc in nlp.pipe(lines, n_threads=n_threads, disable=['parser', 'tagger', 'ner']) ]
-    #return ([ [ word_to_id.get(token.lower_, unk_id) for token in doc ] for doc in docs ],
-           #[ [ token.lower_ for token in doc ] for doc in docs ])
 
 def single_thread_nlp_pipeline(lines):
+    ''' Another single thread pipeline '''
     return [ nlp(line) for line in lines ]
 
 def main():
