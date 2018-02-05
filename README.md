@@ -1,6 +1,6 @@
 # Paraphraser 
 
-This project providers users the ability to generate paraphrases for sentences through a clean and simple API.  A demo can be seen here: [http://pair-a-phrase.it](Pair-a-phrase)
+This project providers users the ability to generate paraphrases for sentences through a clean and simple API.  A demo can be seen here: [Pair-a-phrase](http://pair-a-phrase.it)
 
 ### Prerequisites
 
@@ -13,7 +13,7 @@ pip install git+git://github.com/vsuthichai/paraphraser.git
 ```
 
 ### Usage
-```
+```python
 from paraphraser import paraphrase
 print(paraphrase("hello world"))
 ```
