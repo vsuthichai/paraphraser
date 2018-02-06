@@ -30,7 +30,7 @@ def debug_data(seq_source_ids, seq_ref_ids, seq_source_len, seq_ref_len, id_to_v
     logging.info(seq_ref_len)
     logging.info("==============================================================")
 
-def dataset_config()
+def dataset_config():
     """Dataset configuration.  Dataset files are grouped by sentences of maximum
     length for train, dev, and test.  """
 
