@@ -9,7 +9,7 @@ from lstm_model import lstm_model
 from load_sent_embeddings import load_sentence_embeddings
 from dataset_generator import ParaphraseDataset
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
-from utils import dataset_config, debug_data
+from utils import dataset_config, debug_data, summarize_scalar
 import logging
 
 logging.basicConfig(format = u'[%(asctime)s] %(levelname)-8s : %(message)s', level = logging.INFO)
@@ -76,7 +76,7 @@ def evaluate(sess, model, dataset_generator, mode, id_to_vocab):
 
     bleu_score = corpus_bleu(all_seq_ref_words, all_bleu_pred_words, smoothing_function=chencherry.method1)
     loss = sum(batch_losses) / len(batch_losses)
-    logging.info("{} : Evaluating on {} set loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), mode, loss, bleu_score), flush=True)
+    logging.info("{} : Evaluating on {} set loss={:.4f} bleu={:.4f}".format(dt.datetime.now(), mode, loss, bleu_score))
     return loss, bleu_score
 
 def infer(sess, args, model, id_to_vocab, end_id):
@@ -306,7 +306,7 @@ def main():
                     train_loss = sum(train_losses) / len(train_losses)
                     summarize_scalar(train_writer, 'loss', train_loss, global_step)
                     logging.info("{} : step={} epoch={} batch_loss={:.4f} train_loss={:.4f} bleu={:.4f}".format(
-                        dt.datetime.now(), global_step, epoch, batch_loss, train_loss, bleu_score), flush=True)
+                        dt.datetime.now(), global_step, epoch, batch_loss, train_loss, bleu_score))
 
                 # Print predictions for this batch every 1000 steps
                 # Evaluate on dev set

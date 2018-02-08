@@ -6,7 +6,7 @@ The paraphraser was developed for Praxis SW under the [Insight Data Science Arti
 
 ## Model
 
-The underlying model is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.
+The underlying model is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.  Downloadable link here: [paraphrase model](https://drive.google.com/open?id=19QDCd4UMgt3FtlYYwu0qZU3G1F9_XCvk)
 
 ### Datasets
 
