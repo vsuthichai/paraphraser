@@ -32,6 +32,7 @@ Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU sco
 * Recurrent layer dropout
 * Greater dataset augmentation 
 * Try residual layer
+* Model compression
 
 ## Citations
 
