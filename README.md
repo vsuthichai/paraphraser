@@ -16,7 +16,9 @@ The underlying model is a bidirectional LSTM encoder and LSTM decoder with atten
 
 ### Inference Execution
 
-```python
+Download the model checkpoint from the link above and run:
+
+```
 python inference.py --checkpoint=<checkpoint_path/model-171856>
 ```
 
