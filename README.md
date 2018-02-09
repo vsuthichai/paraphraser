@@ -8,6 +8,18 @@ The paraphraser was developed for Praxis SW under the [Insight Data Science Arti
 
 The underlying model is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.  Downloadable link here: [paraphrase model](https://drive.google.com/open?id=19QDCd4UMgt3FtlYYwu0qZU3G1F9_XCvk)
 
+### Prerequisiteis
+
+* python 3.5
+* Tensorflow 1.4.1
+* spacy
+
+### Inference Execution
+
+```python
+python inference.py --checkpoint=<checkpoint_path/model-171856>
+```
+
 ### Datasets
 
 The dataset used to train this model is an aggregation of many different public datasets.  To name a few:
