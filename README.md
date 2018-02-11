@@ -1,6 +1,6 @@
 # Paraphraser 
 
-This project providers users the ability to generate paraphrases for sentences through a clean and simple API.  A demo can be seen here: [pair-a-phrase](http://pair-a-phrase.it)
+This project providers users the ability to do paraphrase generation for sentences through a clean and simple API.  A demo can be seen here: [pair-a-phrase](http://pair-a-phrase.it)
 
 The paraphraser was developed under the [Insight Data Science Artificial Intelligence](http://insightdata.ai/) program.
 
