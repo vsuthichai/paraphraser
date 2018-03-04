@@ -23,7 +23,8 @@ class Paraphraser(object):
         self.word_to_id, self.idx_to_word, self.embedding, self.start_id, self.end_id, self.unk_id  = load_sentence_embeddings()
         self.mask_id = 5800
         self.checkpoint = checkpoint
-        self.sess = tf.Session()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+        self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         self.model = lstm_model(self.sess, 'infer', 300, self.embedding, self.start_id, self.end_id, self.mask_id)
         saver = tf.train.Saver()
         saver.restore(self.sess, checkpoint)
@@ -90,9 +91,9 @@ class Paraphraser(object):
 
         predictions = self.sess.run(feeds, feed_dict)[0]
         #print(predictions)
-        return self.translate(predictions, decoder, id_to_vocab)
+        return self.translate(predictions, decoder, id_to_vocab, seq_source_words[0])
 
-    def translate(self, predictions, decoder, id_to_vocab):
+    def translate(self, predictions, decoder, id_to_vocab, seq_source_words):
         """ Translate the vocabulary ids in `predictions` to actual words
         that compose the paraphrase.
 
@@ -109,9 +110,16 @@ class Paraphraser(object):
         for sent_pred in predictions:
             translated = []
             for pred in sent_pred:
+                word = 'UUNNKK'
                 if pred == self.end_id:
                     break
-                word = id_to_vocab[pred]
+                if pred == self.unk_id:
+                    # Search for rare word
+                    for seq_source_word in seq_source_words:
+                        if seq_source_word not in self.word_to_id:
+                            word = seq_source_word
+                else:
+                    word = id_to_vocab[pred]
                 translated.append(word)
             translated_predictions.append(' '.join(translated))
         return translated_predictions

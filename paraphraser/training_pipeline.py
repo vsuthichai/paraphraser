@@ -5,7 +5,7 @@ import os
 import sys
 import datetime as dt
 from six.moves import xrange, input
-from lstm_model import lstm_model
+from lstm_model_beam import lstm_model
 from load_sent_embeddings import load_sentence_embeddings
 from dataset_generator import ParaphraseDataset
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
@@ -324,8 +324,8 @@ def main():
                     dev_writer.flush()
 
                 # Checkpoint.
-                #if global_step % 5000 == 0 and global_step != 0:
-                if global_step % 50 == 0 and global_step != 0:
+                #if global_step % 50 == 0 and global_step != 0:
+                if global_step % 5000 == 0 and global_step != 0:
                     saver.save(sess, os.path.join(train_logdir, 'model'), global_step=global_step)
 
                 global_step += 1
