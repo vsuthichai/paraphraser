@@ -1,5 +1,5 @@
 import tensorflow as tf
-from load_sent_embeddings import load_sentence_embeddings
+from embeddings import load_sentence_embeddings
 from preprocess_data import preprocess_batch
 from six.moves import input
 from lstm_model import lstm_model
@@ -20,8 +20,7 @@ class Paraphraser(object):
         Args:
             checkpoint: A path to the checkpoint
         """
-        self.word_to_id, self.idx_to_word, self.embedding, self.start_id, self.end_id, self.unk_id  = load_sentence_embeddings()
-        self.mask_id = 5800
+        self.word_to_id, self.idx_to_word, self.embedding, self.start_id, self.end_id, self.unk_id, self.mask_id = load_sentence_embeddings()
         self.checkpoint = checkpoint
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
         self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
@@ -133,7 +132,9 @@ def main():
 
     while 1:
         source_sentence = input("Source: ")
-        paraphrases = paraphraser.sample_paraphrase(source_sentence, sampling_temp=1.0, how_many=5)
+        #p = paraphraser.greedy_paraphrase(source_sentence)
+        #print(p)
+        paraphrases = paraphraser.sample_paraphrase(source_sentence, sampling_temp=0.75, how_many=10)
         for i, paraphrase in enumerate(paraphrases):
             print("Paraph #{}: {}".format(i, paraphrase))
 

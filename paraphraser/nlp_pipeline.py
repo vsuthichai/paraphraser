@@ -29,7 +29,7 @@ def single_thread_nlp_pipeline(lines):
 
 def main():
     import datetime as dt    
-    from load_sent_embeddings import load_sentence_embeddings
+    from embeddings import load_sentence_embeddings
     #pool = mp.Pool(10)
 
     word_to_id, idx_to_word, embedding, start_id, end_id, unk_id = load_sentence_embeddings()

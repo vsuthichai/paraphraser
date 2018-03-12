@@ -6,7 +6,7 @@ import sys
 import datetime as dt
 from six.moves import xrange, input
 from lstm_model_beam import lstm_model
-from load_sent_embeddings import load_sentence_embeddings
+from embeddings import load_sentence_embeddings
 from dataset_generator import ParaphraseDataset
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 from utils import dataset_config, debug_data, summarize_scalar
@@ -198,8 +198,7 @@ def parse_arguments():
 def main():
     """Entry point for all training, evaluation, and model compression begins here"""
     args = parse_arguments()
-    word_to_id, id_to_vocab, embeddings, start_id, end_id, unk_id = load_sentence_embeddings()
-    mask_id = 5800
+    word_to_id, id_to_vocab, embeddings, start_id, end_id, unk_id, mask_id = load_sentence_embeddings()
     vocab_size, embedding_size = embeddings.shape
     lr = args.lr
 
@@ -305,8 +304,7 @@ def main():
                     summarize_scalar(train_writer, 'bleu_score', bleu_score, global_step)
                     train_loss = sum(train_losses) / len(train_losses)
                     summarize_scalar(train_writer, 'loss', train_loss, global_step)
-                    logging.info("{} : step={} epoch={} batch_loss={:.4f} train_loss={:.4f} bleu={:.4f}".format(
-                        dt.datetime.now(), global_step, epoch, batch_loss, train_loss, bleu_score))
+                    logging.info("step={} epoch={} batch_loss={:.4f} train_loss={:.4f} bleu={:.4f}".format(global_step, epoch, batch_loss, train_loss, bleu_score))
 
                 # Print predictions for this batch every 1000 steps
                 # Evaluate on dev set

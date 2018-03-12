@@ -1,6 +1,6 @@
 import numpy as np
 from keras.preprocessing.sequence import pad_sequences
-from load_sent_embeddings import load_sentence_embeddings
+from embeddings import load_sentence_embeddings
 from six.moves import xrange
 from six import iteritems
 from random import shuffle
@@ -186,8 +186,8 @@ if __name__ == '__main__':
     from pprint import pprint as pp
     from utils import dataset_config
     dataset = dataset_config()
-    word_to_id, idx_to_word, embeddings, start_id, end_id, unk_id = load_sentence_embeddings()
-    pd = ParaphraseDataset(dataset, 10, embeddings, word_to_id, start_id, end_id, unk_id, mask_id=5800)
+    word_to_id, idx_to_word, embeddings, start_id, end_id, unk_id, mask_id = load_sentence_embeddings()
+    pd = ParaphraseDataset(dataset, 10, embeddings, word_to_id, start_id, end_id, unk_id, mask_id)
     generator = pd.generate_batch('train')
     for i, d in enumerate(generator):
         if i == 5:

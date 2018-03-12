@@ -21,9 +21,9 @@ batches where each batch contains similar length sentences.
 import os
 from six import iteritems
 from nlp_pipeline import openmp_nlp_pipeline
-from load_sent_embeddings import load_sentence_embeddings
+from embeddings import load_sentence_embeddings
 
-word_to_id, idx_to_word, embedding, start_id, end_id, unk_id = load_sentence_embeddings()
+word_to_id, idx_to_word, embedding, start_id, end_id, unk_id, mask_id = load_sentence_embeddings()
 
 def generate_length_index(max_lengths):
     l = []
