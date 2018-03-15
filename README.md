@@ -47,6 +47,7 @@ Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU sco
 * Greater dataset augmentation 
 * Try residual layer
 * Model compression
+* Byte pair encoding for out of set vocabulary
 
 ## Citations
 
