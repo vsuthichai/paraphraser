@@ -6,7 +6,7 @@ The paraphraser was developed under the [Insight Data Science Artificial Intelli
 
 ## Model
 
-The underlying model is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.  Downloadable link here: [paraphrase model](https://drive.google.com/open?id=19QDCd4UMgt3FtlYYwu0qZU3G1F9_XCvk)
+The underlying model is a bidirectional LSTM encoder and LSTM decoder with attention trained using Tensorflow.  Downloadable link here: [paraphrase model](https://drive.google.com/open?id=18uOQsosF4uVGvUgp6pB4BKrQZ1FktlmM)
 
 ### Prerequisiteis
 
