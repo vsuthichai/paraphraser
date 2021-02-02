@@ -1,5 +1,5 @@
 backports.weakref==1.0rc1
-bleach==1.5.0
+bleach==3.3.0
 blessings==1.6
 blis==0.0.13
 bottle==0.12.13
