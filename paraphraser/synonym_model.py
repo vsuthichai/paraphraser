@@ -6,7 +6,7 @@ from nltk.corpus import wordnet as wn
 from six.moves import xrange
 import random
 
-nlp = spacy.load('en')
+nlp = spacy.load('en_core_web_sm')
 
 def generate_sentence(original_doc, new_tokens):
     new_sentence = ' '.join(new_tokens).replace('_', ' ')
