@@ -77,12 +77,12 @@ Activate the environment
 conda activate paraphraser-env
 ```
 
-Download the model checkpoint, rename it to "checkpoints", and place it within the /paraphraser/paraphraser directory
+Download the model checkpoint from above, rename it to "checkpoints", and place it within the /paraphraser/paraphraser directory
 
 Download para-nmt-50m [here](https://drive.google.com/file/d/1l2liCZqWX3EfYpzv9OmVatJAEISPFihW/view)
 * Rename it to para-nmt-50m and place it inside the /paraphraser directory
 
-You may need to run the following two commands
+You MAY need to run the following three commands (when prompted)
 ```
 conda install tensorflow==1.14
 conda install spacy
