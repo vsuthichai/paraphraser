@@ -6,7 +6,7 @@ from pprint import pprint as pp
 
 def load_sentence_embeddings():
     '''Load John Wieting sentence embeddings'''
-    with open("../../para-nmt-50m/data/ngram-word-concat-40.pickle", 'rb') as f:
+    with open("../para-nmt-50m/ngram-word-concat-40.pickle", 'rb') as f:
         # [ numpy.ndarray(95283, 300), numpy.ndarray(74664, 300), (trigram_dict, word_dict)]
         x = pickle.load(f, encoding='latin1')
         word_vocab_size, embedding_size = x[1].shape
