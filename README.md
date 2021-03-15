@@ -84,6 +84,7 @@ Download para-nmt-50m [here](https://drive.google.com/file/d/1l2liCZqWX3EfYpzv9O
 
 You may need to run the following two commands
 ```
+conda install tensorflow==1.14
 conda install spacy
 python3 -m spacy download en_core_web_sm
 ```
