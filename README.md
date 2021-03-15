@@ -67,26 +67,26 @@ Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU sco
 ```
 
 ## Additional Setup Requirements
-1) Create the environment in the /paraphraser directory
+Create the environment in the /paraphraser directory
 ```
 conda env create -f env.yml
 ``` 
 
-2) Activate the environment
+Activate the environment
 ```
 conda activate paraphraser-env
 ```
 
-3) Download para-nmt-50m [here](https://drive.google.com/file/d/1l2liCZqWX3EfYpzv9OmVatJAEISPFihW/view)
+Download para-nmt-50m [here](https://drive.google.com/file/d/1l2liCZqWX3EfYpzv9OmVatJAEISPFihW/view)
 * Rename it to para-nmt-50m and place it inside the /paraphraser directory
 
-4) You may need to run the following two commands
+You may need to run the following two commands
 ```
 conda install spacy
 python3 -m spacy download en_core_web_sm
 ```
 
-5) Run the ```inference.py``` script
+Run the ```inference.py``` script
 ```
 cd paraphraser
 python inference.py --checkpoint=checkpoints/model-171856
