@@ -2,7 +2,7 @@ backports.weakref==1.0rc1
 bleach==1.5.0
 blessings==1.6
 blis==0.0.13
-bottle==0.12.13
+bottle==0.12.19
 certifi==2017.11.5
 chardet==3.0.4
 cycler==0.10.0
