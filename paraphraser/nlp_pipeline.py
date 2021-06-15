@@ -4,7 +4,7 @@ from spacy.tokenizer import Tokenizer
 import datetime as dt
 import multiprocessing as mp
 
-nlp = spacy.load('en')
+nlp = spacy.load('en_core_web_sm')
 tokenizer = Tokenizer(nlp.vocab)
 
 def nlp_pipeline(sentence, word_to_id, unk_id):
