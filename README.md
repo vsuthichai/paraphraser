@@ -1,6 +1,6 @@
 # Paraphraser 
 
-This project providers users the ability to do paraphrase generation for sentences through a clean and simple API.  A demo can be seen here: [pair-a-phrase](http://pair-a-phrase.it)
+This project provides users the ability to do paraphrase generation for sentences through a clean and simple API.  A demo can be seen here: [pair-a-phrase](http://pair-a-phrase.it)
 
 The paraphraser was developed under the [Insight Data Science Artificial Intelligence](http://insightdata.ai/) program.
 
@@ -35,7 +35,7 @@ I have not included the aggregated dataset as part of this repo.  If you're curi
 
 ### Training
 
-Training was done for 2 epochs on a Nvidia GTX 1080 and evaluted on the BLEU score. The Tensorboard training curves can be seen below.  The grey curve is train and the orange curve is dev.
+Training was done for 2 epochs on a Nvidia GTX 1080 and evaluated on the BLEU score. The Tensorboard training curves can be seen below.  The grey curve is train and the orange curve is dev.
 
 <img src="https://raw.githubusercontent.com/vsuthichai/paraphraser/master/images/20180128-035256-plot.png" align="center">
 
