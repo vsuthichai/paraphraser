@@ -29,8 +29,7 @@ setup(
     description='Generate sentence paraphrases given an input sentence',
     long_description=long_desc,
     url='https://github.com/vsuthichai/paraphraser',
-    author='Victor Suthichai',
-    author_email='victor.suthichai@gmail.com',
+    author='Victor',
 
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
