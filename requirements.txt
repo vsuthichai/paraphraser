@@ -18,7 +18,7 @@ gpustat==0.4.1
 h5py==2.7.1
 html5lib==0.9999999
 idna==2.6
-ipython==6.1.0
+ipython==7.16.3
 ipython-genutils==0.2.0
 jedi==0.10.2
 Keras==2.1.3
